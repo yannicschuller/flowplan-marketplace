@@ -37,6 +37,27 @@ Every package is checked on upload and the findings (error / warning / info) are
 
 `submitted → in_review → published | changes_requested | rejected`; `changes_requested → submitted` (author revises); `published → unpublished → published` (admin); `withdrawn` (author). Opening a submission in the admin API starts its review. A new version of a published template is a new submission; the published one stays until the new one is accepted.
 
+## Official templates
+
+Flowplan's built-in templates (documents and databases, whiteboards, workflows) are in the marketplace from the first start, by the built-in author **Flowplan** (`/u/flowplan`, badge *Offiziell* / *Official* on cards, template pages and the author page, filter *Nur offizielle* / *Official only* on the browse page). That author has no e-mail address and no GitHub account and can't sign in; nobody else can get the handle `flowplan`.
+
+How they get there:
+
+1. In the Flowplan repository: `npm run marketplace-official -- ../flowplan-marketplace/seed/official` writes one `<slug>.flowplan-template` per built-in template.
+2. Commit `seed/official/` here.
+3. The image rebuild (`.github/workflows/docker.yml`) ships the folder as `/app/seed/official`; the next start publishes what is new or changed (`lib/official.ts`, called from `instrumentation.ts`). By hand: `npm run seed-official [-- <folder>]` (uses `MARKETPLACE_DATA_DIR`).
+
+Per file – the file name without `.flowplan-template` is the template's stable key and, if free, its slug:
+
+- **new** → a new template, published at once;
+- **changed** (SHA-256 of the file) → a new version, published at once (no review);
+- **unchanged** → nothing;
+- **unpublished by an admin** → left alone, also when the file changes (republish it in flowplan-admin to get updates again);
+- **fails the normal package checks**, or the kind changed → skipped with a warning in the log; the other files and the start go on;
+- **removed from the folder** → the template stays as it is (unpublish it in flowplan-admin).
+
+The metadata comes from `template.json`; two optional fields there: `license` (default `CC0-1.0`) and `changelog`. Every change is in the audit log with actor `seed` (`official_created`, `official_updated`; `official_skipped` and `official_invalid` once per file content). Demo mode (`npm run demo`) loads the folder too.
+
 ## Browser hand-overs
 
 **Flowplan → Marketplace** (*Im Marketplace veröffentlichen…*): the instance opens `/submit?handover=1`; the page posts `{type: "flowplan-marketplace-ready"}` to `window.opener` (target `*`) and accepts `{type: "flowplan-marketplace-package", name, bytes: ArrayBuffer}` only when `event.source === window.opener`. The package is checked, the form prefilled, and kept in IndexedDB while the author signs in.
@@ -51,7 +72,7 @@ CORS `*` for GET. Published templates only.
 
 | | |
 |---|---|
-| `GET /api/templates?kind=&category=&q=&lang=&sort=newest\|popular\|updated\|title\|featured&limit=&offset=&author=` | list (`{templates, total}`) |
+| `GET /api/templates?kind=&category=&q=&lang=&sort=newest\|popular\|updated\|title\|featured&limit=&offset=&author=&official=1` | list (`{templates, total}`); each template has `official: true\|false` |
 | `GET /api/templates/:slug` | detail with description, versions, analysis |
 | `GET /api/templates/:slug/download[?version=N]` | the package (`X-Template-Sha256`, `X-Template-Version`) |
 | `GET /api/templates/:slug/previews/:n[?version=N]` | preview image |
@@ -74,12 +95,15 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `GET /api/admin/featured` · `POST /api/admin/featured` `{templates: [id or slug, …]}` | featured (≤ 12, in order) |
 | `GET /api/admin/audit?limit=` | the audit log |
 
+Official templates (see [Official templates](#official-templates)) carry `official: true` in `GET /api/admin/templates` and in submissions, and their `author` has `official: true` (everybody else: `false`). They can be unpublished, republished and featured like any other template; an unpublished one is not published again by the next start.
+
 ## Environment
 
 | Variable | |
 |---|---|
 | `MARKETPLACE_URL` | public address, e.g. `https://marketplace.flowplan.org` (links, GitHub callback, `Secure` cookies) |
 | `MARKETPLACE_DATA_DIR` | data directory (default `./data`; `/app/data` in the image) |
+| `MARKETPLACE_OFFICIAL_DIR` | folder with the [official templates](#official-templates) (default `./seed/official`; `/app/seed/official` in the image) |
 | `MARKETPLACE_ADMIN_TOKEN` | admin API token, the same value as in flowplan-admin; unset = admin API off |
 | `MARKETPLACE_ADMIN_TOKEN_LABEL` | name of the token in the audit log (default `flowplan-admin`) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in; unset = hidden |

@@ -8,6 +8,7 @@ import { formatBytes, formatDate, localized } from "@/lib/i18n";
 import type { Analysis } from "@/lib/package";
 import { Markdown } from "@/components/markdown";
 import { KindIcon } from "@/components/kind-icon";
+import { OfficialBadge } from "@/components/official-badge";
 import { OpenInFlowplan } from "@/components/open-in-flowplan";
 import { ReportButton } from "@/components/report-button";
 import { previewSrc } from "@/components/template-card";
@@ -48,9 +49,12 @@ export default async function TemplatePage({ params }: Props) {
       </Link>
       <header className="template-head">
         <div className="template-title">
-          <span className="kind-badge">
-            <KindIcon kind={row.kind} size={14} />
-            {kindLabel(t, row.kind)}
+          <span className="badges">
+            <span className="kind-badge">
+              <KindIcon kind={row.kind} size={14} />
+              {kindLabel(t, row.kind)}
+            </span>
+            {!!row.official && <OfficialBadge t={t} />}
           </span>
           <h1>{row.title}</h1>
           <p className="lede">{localized(locale, { de: row.summary_de, en: row.summary_en })}</p>

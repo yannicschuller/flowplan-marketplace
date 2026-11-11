@@ -28,6 +28,8 @@ export type TemplateRow = {
   opens: number;
   created_at: number;
   updated_at: number;
+  official_key: string | null;
+  official_sha256: string | null;
 };
 export type VersionRow = {
   id: string;
@@ -93,7 +95,7 @@ export function parseSubmissionForm(input: unknown): SubmissionForm {
   return parsed.data;
 }
 
-function uniqueSlug(title: string) {
+export function uniqueSlug(title: string) {
   const root = slugify(title, 60);
   for (let i = 0; i < 1000; i++) {
     const slug = i ? `${root}-${i + 1}` : root;
@@ -104,7 +106,7 @@ function uniqueSlug(title: string) {
 
 const templateUrl = (slug: string) => `${config.publicUrl()}/t/${slug}`;
 
-function store(version: { id: string; number: number }, template: { id: string; slug: string }, user: User, inspection: Inspection, form: SubmissionForm) {
+export function store(version: { id: string; number: number }, template: { id: string; slug: string }, user: User, inspection: Inspection, form: SubmissionForm) {
   const bytes = buildPackage(inspection, {
     title: form.title,
     summary: { de: form.summaryDe, en: form.summaryEn },
@@ -121,7 +123,7 @@ function store(version: { id: string; number: number }, template: { id: string; 
   savePreviews(version.id, inspection.previews);
   return bytes;
 }
-const versionFields = (form: SubmissionForm, inspection: Inspection, bytes: Buffer) => {
+export const versionFields = (form: SubmissionForm, inspection: Inspection, bytes: Buffer) => {
   return {
     title: form.title,
     summary_de: form.summaryDe,
@@ -181,43 +183,55 @@ export async function submit(user: User, packageBytes: Uint8Array, formInput: un
         opens: 0,
         created_at: at,
         updated_at: at,
+        official_key: null,
+        official_sha256: null,
       };
       run("INSERT INTO templates(id,slug,author_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", template.id, template.slug, user.id, kind, at, at);
     }
-    const number = (one<{ n: number | null }>("SELECT MAX(number) AS n FROM versions WHERE template_id=?", template.id)?.n ?? 0) + 1;
+    const number = nextVersionNumber(template.id);
     const version = { id: newId(), number };
     const bytes = store(version, template, user, inspection, form);
     const f = versionFields(form, inspection, bytes);
-    run(
-      `INSERT INTO versions(id,template_id,number,status,title,summary_de,summary_en,description_de,description_en,category,tags,min_version,language,license,changelog,manifest,findings,analysis,previews,size,sha256,submitted_at,updated_at)
-       VALUES(?,?,?,'submitted',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      version.id,
-      template.id,
-      number,
-      f.title,
-      f.summary_de,
-      f.summary_en,
-      f.description_de,
-      f.description_en,
-      f.category,
-      f.tags,
-      f.min_version,
-      f.language,
-      f.license,
-      f.changelog,
-      f.manifest,
-      f.findings,
-      f.analysis,
-      f.previews,
-      f.size,
-      f.sha256,
-      at,
-      at,
-    );
+    insertVersion(version, template.id, f, "submitted", at);
     run("UPDATE templates SET updated_at=? WHERE id=?", at, template.id);
     return { templateId: template.id, slug: template.slug, versionId: version.id, number, findings: inspection.findings };
   });
 }
+
+// One version row; "published" (official templates) is decided at once.
+export function insertVersion(version: { id: string; number: number }, templateId: string, f: ReturnType<typeof versionFields>, status: "submitted" | "published", at: number) {
+  const decided = status === "published" ? at : null;
+  run(
+    `INSERT INTO versions(id,template_id,number,status,title,summary_de,summary_en,description_de,description_en,category,tags,min_version,language,license,changelog,manifest,findings,analysis,previews,size,sha256,submitted_at,updated_at,decided_at,published_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    version.id,
+    templateId,
+    version.number,
+    status,
+    f.title,
+    f.summary_de,
+    f.summary_en,
+    f.description_de,
+    f.description_en,
+    f.category,
+    f.tags,
+    f.min_version,
+    f.language,
+    f.license,
+    f.changelog,
+    f.manifest,
+    f.findings,
+    f.analysis,
+    f.previews,
+    f.size,
+    f.sha256,
+    at,
+    at,
+    decided,
+    decided,
+  );
+}
+export const nextVersionNumber = (templateId: string) => (one<{ n: number | null }>("SELECT MAX(number) AS n FROM versions WHERE template_id=?", templateId)?.n ?? 0) + 1;
 
 // Changing a submission that waits (submitted) or came back (changes
 // requested → submitted again). Without a new package the stored one is
@@ -299,7 +313,7 @@ export function mySubmissions(user: User) {
 
 // ---- What everybody sees ----
 
-export type PublicFilters = { kind?: string; category?: string; q?: string; lang?: string; sort?: string; author?: string; limit?: number; offset?: number; featured?: boolean };
+export type PublicFilters = { kind?: string; category?: string; q?: string; lang?: string; sort?: string; author?: string; limit?: number; offset?: number; featured?: boolean; official?: boolean };
 const PUBLIC_JOIN = `FROM templates t JOIN versions v ON v.id=t.published_version_id JOIN users u ON u.id=t.author_id
   WHERE t.unpublished_at IS NULL AND t.withdrawn_at IS NULL AND v.status='published'`;
 export type PublicRow = VersionRow & {
@@ -313,8 +327,10 @@ export type PublicRow = VersionRow & {
   featured_rank: number | null;
   author_name: string;
   author_handle: string;
+  // 1: published by the built-in author "Flowplan" (lib/official.ts).
+  official: number;
 };
-const PUBLIC_SELECT = `SELECT v.*, t.id AS t_id, t.slug, t.kind, t.published_at AS t_published_at, t.updated_at AS t_updated_at, t.downloads AS t_downloads, t.opens, t.featured_rank, u.name AS author_name, u.handle AS author_handle ${PUBLIC_JOIN}`;
+const PUBLIC_SELECT = `SELECT v.*, t.id AS t_id, t.slug, t.kind, t.published_at AS t_published_at, t.updated_at AS t_updated_at, t.downloads AS t_downloads, t.opens, t.featured_rank, u.name AS author_name, u.handle AS author_handle, u.system AS official ${PUBLIC_JOIN}`;
 
 export function publicTemplates(filters: PublicFilters = {}) {
   const where: string[] = [];
@@ -336,6 +352,7 @@ export function publicTemplates(filters: PublicFilters = {}) {
     params.push(filters.author);
   }
   if (filters.featured) where.push("t.featured_rank IS NOT NULL");
+  if (filters.official) where.push("u.system=1");
   const q = filters.q?.trim().slice(0, 100);
   if (q)
     for (const word of q.split(/\s+/).slice(0, 5)) {
@@ -420,6 +437,7 @@ export function templateSummary(row: PublicRow) {
     downloads: row.t_downloads,
     opens: row.opens,
     featured: row.featured_rank !== null,
+    official: !!row.official,
     previewUrl: previews[0] ?? null,
     previews,
     downloadUrl: `${config.publicUrl()}/api/templates/${row.slug}/download`,

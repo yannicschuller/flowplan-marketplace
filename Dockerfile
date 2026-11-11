@@ -39,6 +39,8 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 # Placeholders for the legal pages until data/legal/ has the real texts.
 COPY --from=build /app/docs/legal ./docs/legal
+# Official templates, published on every start (lib/official.ts).
+COPY --from=build /app/seed/official ./seed/official
 USER node
 VOLUME ["/app/data"]
 EXPOSE 3000

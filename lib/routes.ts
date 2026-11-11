@@ -48,6 +48,7 @@ export function listTemplatesRoute(request: Request) {
     sort,
     featured: sort === "featured",
     author: p.get("author") || undefined,
+    official: p.get("official") === "1" || p.get("official") === "true",
     limit: Number(p.get("limit") || 24),
     offset: Number(p.get("offset") || 0),
   });

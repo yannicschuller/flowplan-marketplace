@@ -21,7 +21,14 @@ export type User = {
   github_login: string | null;
   created_at: number;
   blocked_at: number | null;
+  // 1 for the built-in author of the official templates: no sign-in.
+  system?: number;
 };
+
+// The handle of the built-in author "Flowplan" (lib/official.ts); nobody
+// else can get it, even before that author exists.
+export const OFFICIAL_HANDLE = "flowplan";
+const RESERVED_HANDLES = new Set([OFFICIAL_HANDLE]);
 
 // ---- Users ----
 
@@ -44,7 +51,7 @@ function uniqueHandle(base: string) {
   const root = slugify(base, 30);
   for (let i = 0; i < 1000; i++) {
     const handle = i ? `${root}-${i + 1}` : root;
-    if (!one("SELECT 1 FROM users WHERE handle=?", handle)) return handle;
+    if (!RESERVED_HANDLES.has(handle) && !one("SELECT 1 FROM users WHERE handle=?", handle)) return handle;
   }
   return `${root}-${randomToken(4).toLowerCase()}`;
 }
@@ -76,6 +83,7 @@ export function renameUser(userId: string, name: string) {
 // ---- Sessions ----
 
 export function createSession(userId: string) {
+  if (getUser(userId)?.system) throw new HttpError(403, "system_account", "This account can't sign in.");
   const token = randomToken();
   const at = now();
   run("INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)", sha256(token), userId, at, at + SESSION_DAYS * 86_400_000);
@@ -90,7 +98,7 @@ export function userForSessionToken(token: string | undefined | null): User | nu
     "SELECT u.*, s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=?",
     sha256(token),
   );
-  if (!row || row.expires_at < now() || row.blocked_at) return null;
+  if (!row || row.expires_at < now() || row.blocked_at || row.system) return null;
   const { expires_at: _expires, ...user } = row;
   return user;
 }

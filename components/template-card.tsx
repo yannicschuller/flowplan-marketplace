@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { KindIcon } from "./kind-icon";
+import { OfficialBadge } from "./official-badge";
 import { kindLabel } from "@/lib/catalog";
 import { localized, type Locale, translate } from "@/lib/i18n";
 import { parseJsonColumn, type PreviewInfo, type PublicRow } from "@/lib/store";
@@ -24,9 +25,12 @@ export function TemplateCard({ row, locale }: { row: PublicRow; locale: Locale }
           )}
         </div>
         <div className="card-body">
-          <span className="kind-badge">
-            <KindIcon kind={row.kind} size={14} />
-            {kindLabel(t, row.kind)}
+          <span className="badges">
+            <span className="kind-badge">
+              <KindIcon kind={row.kind} size={14} />
+              {kindLabel(t, row.kind)}
+            </span>
+            {!!row.official && <OfficialBadge t={t} />}
           </span>
           <h3>{row.title}</h3>
           <p>{localized(locale, { de: row.summary_de, en: row.summary_en })}</p>

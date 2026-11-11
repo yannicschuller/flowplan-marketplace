@@ -248,7 +248,8 @@ const demos = (): Demo[] => [
 ];
 
 export async function seedDemo() {
-  if (one("SELECT 1 FROM templates LIMIT 1")) return false;
+  // Official templates (lib/official.ts) don't count: the demo comes on top.
+  if (one("SELECT 1 FROM templates t JOIN users u ON u.id=t.author_id WHERE u.system=0 LIMIT 1")) return false;
   const authors: Record<Demo["author"], User> = {
     demo: one<User>("SELECT * FROM users WHERE handle='demo'") ?? createUser({ name: "Demo-Autorin", email: "demo@example.org", handle: "demo" }),
     jonas: createUser({ name: "Jonas Weber", githubId: "1000001", githubLogin: "jonasweber" }),

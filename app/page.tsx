@@ -5,8 +5,9 @@ import { CATEGORIES, KINDS, categoryLabel, kindLabel } from "@/lib/catalog";
 import { TemplateCard } from "@/components/template-card";
 import { KindIcon } from "@/components/kind-icon";
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
+import { SealCheck } from "@phosphor-icons/react/dist/ssr/SealCheck";
 
-type Search = { q?: string; kind?: string; category?: string; sort?: string; lang?: string };
+type Search = { q?: string; kind?: string; category?: string; sort?: string; lang?: string; official?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const { t, locale } = await pageT();
@@ -15,18 +16,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const category = (CATEGORIES as readonly string[]).includes(sp.category ?? "") ? sp.category : undefined;
   const q = (sp.q ?? "").slice(0, 100);
   const sort = ["newest", "popular", "title"].includes(sp.sort ?? "") ? sp.sort : "newest";
-  const filtering = !!(q || kind || category || sp.sort);
+  // "Official only": the templates built into Flowplan (lib/official.ts).
+  const official = sp.official === "1" ? "1" : undefined;
+  const filtering = !!(q || kind || category || sp.sort || official);
+  const officialCount = publicTemplates({ official: true, limit: 1 }).total;
   const kinds = new Map(kindCounts().map((k) => [k.kind, k.n]));
   const categories = new Map(categoryCounts().map((c) => [c.category, c.n]));
   const link = (change: Partial<Search>) => {
     const p = new URLSearchParams();
-    const next = { q, kind, category, sort: sp.sort, ...change };
+    const next = { q, kind, category, sort: sp.sort, official, ...change };
     for (const [k, v] of Object.entries(next)) if (v) p.set(k, v);
     const s = p.toString();
     return s ? `/?${s}#browse` : "/#browse";
   };
 
-  const results = filtering ? publicTemplates({ q, kind, category, sort, limit: 60 }) : null;
+  const results = filtering ? publicTemplates({ q, kind, category, sort, official: !!official, limit: 60 }) : null;
   const featured = filtering ? null : publicTemplates({ featured: true, limit: 6 }).rows;
   const newest = filtering ? null : publicTemplates({ sort: "newest", limit: 6 }).rows;
   const popular = filtering ? null : publicTemplates({ sort: "popular", limit: 6 }).rows;
@@ -47,6 +51,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <input type="search" name="q" defaultValue={q} placeholder={t("Vorlagen suchen …", "Search templates …")} aria-label={t("Vorlagen suchen", "Search templates")} maxLength={100} />
           {kind && <input type="hidden" name="kind" value={kind} />}
           {category && <input type="hidden" name="category" value={category} />}
+          {official && <input type="hidden" name="official" value={official} />}
           <button type="submit" className="button primary">
             {t("Suchen", "Search")}
           </button>
@@ -65,6 +70,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
               <span className="chip-count">{kinds.get(k) ?? 0}</span>
             </Link>
           ))}
+          {officialCount > 0 && (
+            <Link href={link({ official: official ? undefined : "1" })} className={`chip chip-official${official ? " active" : ""}`}>
+              <SealCheck size={15} weight="fill" aria-hidden="true" />
+              {t("Nur offizielle", "Official only")}
+              <span className="chip-count">{officialCount}</span>
+            </Link>
+          )}
         </div>
 
         {results ? (
