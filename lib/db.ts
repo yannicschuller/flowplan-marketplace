@@ -108,6 +108,13 @@ const MIGRATIONS: string[] = [
      window_start INTEGER NOT NULL,
      count INTEGER NOT NULL
    );`,
+  // 4: official templates – the built-in author "Flowplan" (system = 1, no
+  // sign-in) and, per template, the seed file it comes from (file name
+  // without extension) and that file's SHA-256 when it was last published.
+  `ALTER TABLE users ADD COLUMN system INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE templates ADD COLUMN official_key TEXT;
+   ALTER TABLE templates ADD COLUMN official_sha256 TEXT;
+   CREATE UNIQUE INDEX templates_official_key ON templates(official_key) WHERE official_key IS NOT NULL;`,
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 

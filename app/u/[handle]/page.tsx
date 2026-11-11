@@ -5,6 +5,7 @@ import { userByHandle } from "@/lib/auth";
 import { publicTemplates } from "@/lib/store";
 import { formatDate } from "@/lib/i18n";
 import { TemplateCard } from "@/components/template-card";
+import { OfficialBadge } from "@/components/official-badge";
 
 type Props = { params: Promise<{ handle: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -21,17 +22,27 @@ export default async function AuthorPage({ params }: Props) {
     <div>
       <header className="page-head">
         <p className="eyebrow">{t("Autor:in", "Author")}</p>
-        <h1>{user.name}</h1>
+        <h1 className="author-name">
+          {user.name}
+          {!!user.system && <OfficialBadge t={t} />}
+        </h1>
         <p className="lede">
-          {user.github_login && (
+          {user.system ? (
+            <>{t("Die Vorlagen, die in Flowplan eingebaut sind – hier zum Stöbern und Importieren.", "The templates built into Flowplan – here to browse and import.")} · </>
+          ) : (
             <>
-              <a href={`https://github.com/${encodeURIComponent(user.github_login)}`} rel="noopener noreferrer nofollow">
-                GitHub @{user.github_login}
-              </a>{" "}
-              ·{" "}
+              {user.github_login && (
+                <>
+                  <a href={`https://github.com/${encodeURIComponent(user.github_login)}`} rel="noopener noreferrer nofollow">
+                    GitHub @{user.github_login}
+                  </a>{" "}
+                  ·{" "}
+                </>
+              )}
+              {t(`Dabei seit ${formatDate(locale, user.created_at)}`, `Member since ${formatDate(locale, user.created_at)}`)} ·{" "}
             </>
           )}
-          {t(`Dabei seit ${formatDate(locale, user.created_at)}`, `Member since ${formatDate(locale, user.created_at)}`)} · {rows.length === 1 ? t("1 Vorlage", "1 template") : t(`${rows.length} Vorlagen`, `${rows.length} templates`)}
+          {rows.length === 1 ? t("1 Vorlage", "1 template") : t(`${rows.length} Vorlagen`, `${rows.length} templates`)}
         </p>
       </header>
       {rows.length ? (

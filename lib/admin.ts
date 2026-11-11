@@ -54,7 +54,8 @@ const templateState = (t: { published_version_id: string | null; unpublished_at:
   t.withdrawn_at ? "withdrawn" : t.unpublished_at ? "unpublished" : t.published_version_id ? "listed" : "unlisted";
 const authorOf = (id: string) => {
   const u = one<User>("SELECT * FROM users WHERE id=?", id)!;
-  return { id: u.id, name: u.name, handle: u.handle, email: u.email, github: u.github_login, since: iso(u.created_at), blocked: !!u.blocked_at };
+  // official: the built-in author "Flowplan" of the official templates (lib/official.ts).
+  return { id: u.id, name: u.name, handle: u.handle, email: u.email, github: u.github_login, since: iso(u.created_at), blocked: !!u.blocked_at, official: !!u.system };
 };
 const counts = (findings: Finding[]) => ({
   error: findings.filter((f) => f.level === "error").length,
@@ -66,6 +67,7 @@ const adminBase = () => `${config.publicUrl()}/api/admin`;
 function submissionSummary(v: VersionWithTemplate) {
   const findings = findingsOf(v);
   const previews = parseJsonColumn<PreviewInfo[]>(v.previews, []);
+  const author = authorOf(v.author_id);
   return {
     id: v.id,
     templateId: v.template_id,
@@ -90,7 +92,8 @@ function submissionSummary(v: VersionWithTemplate) {
     reviewMessage: v.review_message,
     isUpdate: !!v.published_version_id && v.published_version_id !== v.id,
     templateState: templateState(v),
-    author: authorOf(v.author_id),
+    official: author.official,
+    author,
     submittedAt: iso(v.submitted_at),
     updatedAt: iso(v.updated_at),
     decidedAt: iso(v.decided_at),
@@ -257,22 +260,26 @@ export function listTemplates(state: string | null) {
   return {
     templates: rows
       .filter((t) => wanted === "all" || templateState(t) === wanted)
-      .map((t) => ({
-        id: t.id,
-        slug: t.slug,
-        kind: t.kind,
-        title: t.title,
-        version: t.number,
-        versionId: t.published_version_id,
-        state: templateState(t),
-        unpublishReason: t.unpublish_reason,
-        featuredRank: t.featured_rank,
-        downloads: t.downloads,
-        opens: t.opens,
-        author: authorOf(t.author_id),
-        publishedAt: iso(t.published_at),
-        url: `${config.publicUrl()}/t/${t.slug}`,
-      })),
+      .map((t) => {
+        const author = authorOf(t.author_id);
+        return {
+          id: t.id,
+          slug: t.slug,
+          kind: t.kind,
+          title: t.title,
+          version: t.number,
+          versionId: t.published_version_id,
+          state: templateState(t),
+          unpublishReason: t.unpublish_reason,
+          featuredRank: t.featured_rank,
+          downloads: t.downloads,
+          opens: t.opens,
+          official: author.official,
+          author,
+          publishedAt: iso(t.published_at),
+          url: `${config.publicUrl()}/t/${t.slug}`,
+        };
+      }),
   };
 }
 

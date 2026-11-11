@@ -18,6 +18,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "demo": "node scripts/demo.mjs",
+    "seed-official": "node --disable-warning=ExperimentalWarning --import tsx scripts/seed-official.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=ExperimentalWarning --import tsx --test --test-concurrency=1 tests/*.test.ts",
     "audit": "npm audit --audit-level=low"
