@@ -1,0 +1,24 @@
+# Example deployment with Docker Compose. Coolify does not need this file: it
+# pulls ghcr.io/yannicschuller/flowplan-marketplace or builds the Dockerfile
+# (README "Deploy"). Secrets go into an .env file next to this file (see
+# .env.example) – never commit them.
+services:
+  marketplace:
+    image: ghcr.io/yannicschuller/flowplan-marketplace:latest
+    # build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    env_file: .env
+    environment:
+      MARKETPLACE_DATA_DIR: /app/data
+    volumes:
+      - marketplace-data:/app/data
+    # A TLS-terminating reverse proxy in front; keep this port on localhost.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  marketplace-data:

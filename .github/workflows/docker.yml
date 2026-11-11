@@ -1,0 +1,141 @@
+# Builds the image on every push to main and publishes it to the GitHub
+# Container Registry, for Coolify:
+#   ghcr.io/yannicschuller/flowplan-marketplace:latest       the latest commit on main
+#   ghcr.io/yannicschuller/flowplan-marketplace:sha-abc1234  every build
+# For linux/amd64 and linux/arm64, each built natively on GitHub's runners
+# (ubuntu-latest and ubuntu-24.04-arm, free for public repositories) in
+# parallel, then joined into one multi-platform image. Pull requests only
+# build (no push). Every new :latest is rolled out on Coolify
+# (COOLIFY_WEBHOOK, COOLIFY_TOKEN; see README).
+name: Docker image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One native build per platform – no QEMU emulation. Each pushes its image
+  # by digest only; "image" below tags them together.
+  build:
+    # No image for Dependabot: its pull requests are tested by CI, and the
+    # image is built after merging.
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - id: platform
+        run: |
+          platform="${{ matrix.platform }}"
+          echo "pair=${platform//\//-}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No token left in .git, which the image build copies.
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          # Pull requests only build: nothing is published.
+          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || format('type=image,name=ghcr.io/{0},push-by-digest=true,name-canonical=true,push=true', github.repository) }}
+          build-args: |
+            FLOWPLAN_SKIP_TYPECHECK=1
+          # GitHub's Actions cache, one scope per platform, kept between runs.
+          cache-from: type=gha,scope=image-${{ steps.platform.outputs.pair }}
+          cache-to: type=gha,scope=image-${{ steps.platform.outputs.pair }},mode=max
+      - name: Remember the digest
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "$RUNNER_TEMP/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name != 'pull_request'
+        with:
+          name: digests-${{ steps.platform.outputs.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Joins both platform images under the tags.
+  image:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+      - name: Tag the multi-platform image
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+          docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:sha-${GITHUB_SHA::7}"
+
+  # Rolls out the new :latest image on Coolify, never for pull requests.
+  # Coolify's API must accept GitHub's runners (Settings → Advanced → API
+  # access: allowed IPs); the token still guards it. Without the secrets the
+  # step does nothing.
+  deploy:
+    needs: image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy on Coolify
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK" ] || [ -z "$COOLIFY_TOKEN" ]; then echo "No Coolify secrets: nothing to deploy."; exit 0; fi
+          # Coolify's answer explains a refusal (e.g. a missing permission).
+          status=$(curl -sS --retry 3 --max-time 60 -o "$RUNNER_TEMP/coolify.json" -w '%{http_code}' -X POST -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
+          echo "Coolify answered $status: $(head -c 500 "$RUNNER_TEMP/coolify.json")"
+          if [ "$status" -ge 300 ]; then
+            echo "::error::Coolify did not deploy ($status). 401/403: the API token needs the “deploy” permission and the team of the resource; check Settings → Advanced → API access and its allowed IPs."
+            exit 1
+          fi

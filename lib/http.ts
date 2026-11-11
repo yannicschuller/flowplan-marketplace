@@ -39,6 +39,8 @@ export async function handle(fn: () => Promise<Response> | Response, opts: { cor
     if (error instanceof RateLimitError)
       return json({ error: "rate_limited", retryAfter: error.retryAfter }, { status: 429, cors: opts.cors, headers: { "Retry-After": String(error.retryAfter) } });
     if (error instanceof TransitionError) return json({ error: "invalid_transition", message: error.message, status: error.from }, { status: 409, cors: opts.cors });
+    // A stored file that is gone (e.g. a volume restored without packages/).
+    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return json({ error: "not_found" }, { status: 404, cors: opts.cors });
     console.error(error);
     return json({ error: "internal" }, { status: 500, cors: opts.cors });
   }
