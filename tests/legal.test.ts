@@ -1,23 +1,20 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { useTempData, req } from "./helpers";
 import { DEFAULT_IMPRESSUM_URL, DEFAULT_PRIVACY_URL, config } from "../lib/config";
-import { legalHref, legalRedirect, legalUrl, termsText } from "../lib/legal";
+import { legalRedirect, legalUrl, termsText } from "../lib/legal";
 
-const dir = useTempData();
-const VARS = ["MARKETPLACE_IMPRESSUM_URL", "MARKETPLACE_PRIVACY_URL", "MARKETPLACE_TERMS_URL", "MARKETPLACE_LEGAL_DIR"];
+useTempData();
+const VARS = ["MARKETPLACE_IMPRESSUM_URL", "MARKETPLACE_PRIVACY_URL"];
 beforeEach(() => {
   for (const name of VARS) delete process.env[name];
 });
 
-test("Impressum and privacy policy default to the Flowplan website, terms to the own page", () => {
+test("Impressum and privacy policy default to the Flowplan website", () => {
   assert.equal(DEFAULT_IMPRESSUM_URL, "https://flowplan.org/impressum");
   assert.equal(DEFAULT_PRIVACY_URL, "https://flowplan.org/datenschutz");
   assert.equal(config.impressumUrl(), DEFAULT_IMPRESSUM_URL);
   assert.equal(config.privacyUrl(), DEFAULT_PRIVACY_URL);
-  assert.equal(config.termsUrl(), null);
 });
 
 test("legal addresses must be https URLs", () => {
@@ -26,30 +23,24 @@ test("legal addresses must be https URLs", () => {
   for (const bad of ["http://example.org/impressum", "example.org/impressum", "javascript:alert(1)", "https://user:pw@example.org/", "/impressum"]) {
     process.env.MARKETPLACE_IMPRESSUM_URL = bad;
     process.env.MARKETPLACE_PRIVACY_URL = bad;
-    process.env.MARKETPLACE_TERMS_URL = bad;
     assert.throws(() => config.impressumUrl(), /MARKETPLACE_IMPRESSUM_URL/, bad);
     assert.throws(() => config.privacyUrl(), /MARKETPLACE_PRIVACY_URL/, bad);
-    assert.throws(() => config.termsUrl(), /MARKETPLACE_TERMS_URL/, bad);
   }
 });
 
-test("footer links: the website's page in the visitor's language, the local terms page", () => {
-  assert.equal(legalHref("impressum", "de"), "https://flowplan.org/de/impressum");
-  assert.equal(legalHref("impressum", "en"), "https://flowplan.org/en/impressum");
-  assert.equal(legalHref("datenschutz", "de"), "https://flowplan.org/de/datenschutz");
-  assert.equal(legalHref("datenschutz", "en"), "https://flowplan.org/en/datenschutz");
-  assert.equal(legalHref("nutzungsbedingungen", "en"), "/nutzungsbedingungen");
-  assert.equal(legalUrl("nutzungsbedingungen", "de"), null);
+test("footer links: the website's page in the visitor's language", () => {
+  assert.equal(legalUrl("impressum", "de"), "https://flowplan.org/de/impressum");
+  assert.equal(legalUrl("impressum", "en"), "https://flowplan.org/en/impressum");
+  assert.equal(legalUrl("datenschutz", "de"), "https://flowplan.org/de/datenschutz");
+  assert.equal(legalUrl("datenschutz", "en"), "https://flowplan.org/en/datenschutz");
 });
 
 test("custom addresses are used as given", () => {
   process.env.MARKETPLACE_IMPRESSUM_URL = "https://example.org/impressum";
   process.env.MARKETPLACE_PRIVACY_URL = "https://flowplan.org/privacy";
-  process.env.MARKETPLACE_TERMS_URL = "https://example.org/terms?x=1";
   for (const locale of ["de", "en"] as const) {
-    assert.equal(legalHref("impressum", locale), "https://example.org/impressum");
-    assert.equal(legalHref("datenschutz", locale), "https://flowplan.org/privacy");
-    assert.equal(legalHref("nutzungsbedingungen", locale), "https://example.org/terms?x=1");
+    assert.equal(legalUrl("impressum", locale), "https://example.org/impressum");
+    assert.equal(legalUrl("datenschutz", locale), "https://flowplan.org/privacy");
   }
 });
 
@@ -72,14 +63,15 @@ test("/impressum and /datenschutz redirect permanently in the visitor's language
   assert.equal(legalRedirect("datenschutz", req("/datenschutz", { headers: { "accept-language": "de" } })).headers.get("location"), "https://example.org/privacy");
 });
 
-test("terms: the operator's file, else the placeholder", () => {
-  const placeholder = termsText("de");
-  assert.equal(placeholder.placeholder, true);
-  assert.match(placeholder.text, /^# Nutzungsbedingungen/);
-  const legal = join(dir, "legal");
-  mkdirSync(legal, { recursive: true });
-  writeFileSync(join(legal, "nutzungsbedingungen.de.md"), "# Unsere Bedingungen\n");
-  assert.deepEqual(termsText("de"), { text: "# Unsere Bedingungen\n", placeholder: false });
-  // English falls back to the German file before the placeholder.
-  assert.deepEqual(termsText("en"), { text: "# Unsere Bedingungen\n", placeholder: false });
+test("the Nutzungsbedingungen are the shipped text in both languages", () => {
+  const de = termsText("de");
+  const en = termsText("en");
+  assert.match(de, /^# Nutzungsbedingungen\n/);
+  assert.match(en, /^# Terms of use\n/);
+  for (const text of [de, en]) {
+    assert.doesNotMatch(text, /Platzhalter|Placeholder/i);
+    // Their links point to the website's legal pages.
+    assert.match(text, /\]\(https:\/\/flowplan\.org\/impressum\)/);
+    assert.match(text, /\]\(https:\/\/flowplan\.org\/datenschutz\)/);
+  }
 });

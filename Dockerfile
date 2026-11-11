@@ -2,7 +2,7 @@
 # Flowplan Marketplace – image for Coolify's Dockerfile build pack (or any
 # Docker host). Build with Next.js standalone output, run as the non-root
 # user "node" with one data volume (/app/data: SQLite database, packages,
-# previews, the generated secret key and optional legal texts).
+# previews and the generated secret key).
 FROM node:26-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -37,8 +37,8 @@ RUN mkdir /app/data && chown node:node /app/data && chmod 700 /app/data
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
-# Placeholder for the Nutzungsbedingungen until data/legal/ has the real text.
-COPY --from=build /app/docs/legal ./docs/legal
+# The Nutzungsbedingungen (read at runtime by lib/legal.ts).
+COPY --from=build /app/content/legal ./content/legal
 USER node
 VOLUME ["/app/data"]
 EXPOSE 3000

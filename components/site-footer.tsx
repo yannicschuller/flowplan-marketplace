@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { pageT } from "@/lib/page";
 import { headers } from "next/headers";
-import { legalHref } from "@/lib/legal";
+import { legalUrl } from "@/lib/legal";
 
 export async function SiteFooter() {
   const { t, locale } = await pageT();
@@ -15,8 +15,6 @@ export async function SiteFooter() {
       return "/";
     }
   })();
-  // Impressum and privacy policy are on the website; the terms may be local.
-  const terms = legalHref("nutzungsbedingungen", locale);
   const switchTo = (l: "de" | "en") => `/lang/${l}?next=${encodeURIComponent(back)}`;
   return (
     <footer className="site-footer">
@@ -30,9 +28,10 @@ export async function SiteFooter() {
         <nav className="footer-links" aria-label={t("Rechtliches", "Legal")}>
           <a href="https://flowplan.org">flowplan.org</a>
           <a href="https://docs.flowplan.org">{t("Dokumentation", "Docs")}</a>
-          <a href={legalHref("impressum", locale)}>{t("Impressum", "Legal notice")}</a>
-          <a href={legalHref("datenschutz", locale)}>{t("Datenschutz", "Privacy")}</a>
-          {terms.startsWith("/") ? <Link href={terms}>{t("Nutzungsbedingungen", "Terms of use")}</Link> : <a href={terms}>{t("Nutzungsbedingungen", "Terms of use")}</a>}
+          {/* Impressum and privacy policy are on the website. */}
+          <a href={legalUrl("impressum", locale)}>{t("Impressum", "Legal notice")}</a>
+          <a href={legalUrl("datenschutz", locale)}>{t("Datenschutz", "Privacy")}</a>
+          <Link href="/nutzungsbedingungen">{t("Nutzungsbedingungen", "Terms of use")}</Link>
           <span className="lang-switch" aria-label={t("Sprache", "Language")}>
             {locale === "de" ? <strong>Deutsch</strong> : <a href={switchTo("de")} hrefLang="de">Deutsch</a>}
             {" · "}

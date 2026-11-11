@@ -87,8 +87,6 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `MARKETPLACE_SECRET` | optional key for CSRF tokens and IP hashes; default: generated once as `secret.key` in the data directory |
 | `MARKETPLACE_IMPRESSUM_URL` | Impressum (https, default `https://flowplan.org/impressum`); the footer links there and `/impressum` redirects there (308). For the default address visitors land on `/de/impressum` or `/en/impressum` of the website in their language; other addresses are used as given |
 | `MARKETPLACE_PRIVACY_URL` | privacy policy (https, default `https://flowplan.org/datenschutz`), the same way via `/datenschutz` |
-| `MARKETPLACE_TERMS_URL` | optional: Nutzungsbedingungen elsewhere (https); the footer links there and `/nutzungsbedingungen` redirects there. Unset: the marketplace's own page from `nutzungsbedingungen.de.md`/`.en.md` in `MARKETPLACE_LEGAL_DIR` |
-| `MARKETPLACE_LEGAL_DIR` | folder with `nutzungsbedingungen.de.md`, `nutzungsbedingungen.en.md` (default `<data>/legal`; a placeholder from `docs/legal` until then) |
 | `MARKETPLACE_DEMO` | `1`: demo data and demo sign-in – never in production |
 
 See `.env.example`.
@@ -116,7 +114,7 @@ The image `ghcr.io/yannicschuller/flowplan-marketplace` is built by `.github/wor
 2. **Coolify:** new resource → Docker image `ghcr.io/yannicschuller/flowplan-marketplace:latest` (or the Dockerfile build pack on this repository), domain `https://marketplace.flowplan.org`, port 3000, persistent storage mounted at `/app/data`, healthcheck path `/api/health`.
 3. **Environment:** `MARKETPLACE_URL`, `MARKETPLACE_ADMIN_TOKEN`, GitHub and SMTP variables (below).
 4. Optional automatic roll-out: repository secrets `COOLIFY_WEBHOOK` and `COOLIFY_TOKEN` (as in flowplan-website).
-5. Legal texts: Impressum and privacy policy are those of flowplan.org (`MARKETPLACE_IMPRESSUM_URL`, `MARKETPLACE_PRIVACY_URL`; the defaults fit marketplace.flowplan.org). For the Nutzungsbedingungen put `nutzungsbedingungen.de.md` and `nutzungsbedingungen.en.md` into `/app/data/legal/`, or set `MARKETPLACE_TERMS_URL`.
+5. Legal texts: Impressum and privacy policy are those of flowplan.org (`MARKETPLACE_IMPRESSUM_URL`, `MARKETPLACE_PRIVACY_URL`; the defaults fit marketplace.flowplan.org). The Nutzungsbedingungen at `/nutzungsbedingungen` are part of the code (`content/legal/nutzungsbedingungen.de.md`, `.en.md`); nothing to set up.
 
 `docker-compose.yml` is an example for other hosts.
 
@@ -140,7 +138,7 @@ Generate once (`openssl rand -hex 32`) and set the same value as `MARKETPLACE_AD
 
 ### Backups
 
-Everything lives in the data volume: `marketplace.db` (+ `-wal`), `packages/`, `previews/`, `secret.key`, `legal/` (the Nutzungsbedingungen, if kept here). Back up the whole volume (Coolify's volume backup or a file copy). For a consistent copy of the database while it runs: `sqlite3 /app/data/marketplace.db ".backup /backup/marketplace.db"` (or stop the container briefly). Restoring = putting the files back into the volume.
+Everything lives in the data volume: `marketplace.db` (+ `-wal`), `packages/`, `previews/`, `secret.key`. Back up the whole volume (Coolify's volume backup or a file copy). For a consistent copy of the database while it runs: `sqlite3 /app/data/marketplace.db ".backup /backup/marketplace.db"` (or stop the container briefly). Restoring = putting the files back into the volume.
 
 ## Security notes
 

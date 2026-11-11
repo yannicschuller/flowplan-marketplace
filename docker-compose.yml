@@ -14,11 +14,9 @@ services:
     env_file: .env
     environment:
       MARKETPLACE_DATA_DIR: /app/data
-      # Legal pages (https); these are the defaults. Nutzungsbedingungen:
-      # data/legal/nutzungsbedingungen.de.md / .en.md, or MARKETPLACE_TERMS_URL.
+      # Impressum and privacy policy (https); these are the defaults.
       MARKETPLACE_IMPRESSUM_URL: https://flowplan.org/impressum
       MARKETPLACE_PRIVACY_URL: https://flowplan.org/datenschutz
-      # MARKETPLACE_TERMS_URL: https://example.org/terms
     volumes:
       - marketplace-data:/app/data
     # A TLS-terminating reverse proxy in front; keep this port on localhost.

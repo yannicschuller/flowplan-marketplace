@@ -47,21 +47,7 @@ type Inspection = {
 
 const EMPTY: Fields = { title: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
 
-export function SubmitForm({
-  session,
-  mode,
-  initial,
-  login,
-  returnTo,
-  termsHref,
-}: {
-  session: { name: string; csrf: string } | null;
-  mode: SubmitMode;
-  initial: Fields | null;
-  login: LoginConfig;
-  returnTo: string;
-  termsHref: string;
-}) {
+export function SubmitForm({ session, mode, initial, login, returnTo }: { session: { name: string; csrf: string } | null; mode: SubmitMode; initial: Fields | null; login: LoginConfig; returnTo: string }) {
   const t = useT();
   const locale = t("de", "en") as "de" | "en";
   const [pkg, setPkg] = useState<PendingPackage | null>(null);
@@ -401,7 +387,7 @@ export function SubmitForm({
                 "Ich habe die Rechte an Inhalt, Bildern und Schriften und veröffentliche sie unter der gewählten Lizenz. Es sind keine persönlichen Daten oder Zugangsdaten enthalten.",
                 "I hold the rights to the content, images and fonts and publish them under the chosen licence. No personal data or credentials are included.",
               )}{" "}
-              <a href={termsHref} target="_blank" rel="noopener">
+              <a href="/nutzungsbedingungen" target="_blank">
                 {t("Nutzungsbedingungen", "Terms of use")}
               </a>
             </span>

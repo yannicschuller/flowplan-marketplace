@@ -3,7 +3,6 @@ import { pageSession, pageT } from "@/lib/page";
 import { one } from "@/lib/db";
 import { config } from "@/lib/config";
 import { mailConfigured } from "@/lib/mail";
-import { legalHref } from "@/lib/legal";
 import { parseJsonColumn, type TemplateRow, type VersionRow } from "@/lib/store";
 import { SubmitForm, type Fields, type SubmitMode } from "@/components/submit-form";
 
@@ -25,7 +24,7 @@ const fieldsOf = (v: VersionRow): Fields => ({
 });
 
 export default async function SubmitPage({ searchParams }: { searchParams: Promise<{ template?: string; edit?: string }> }) {
-  const { locale } = await pageT();
+  await pageT();
   const session = await pageSession();
   const sp = await searchParams;
   let mode: SubmitMode = { type: "new" };
@@ -52,7 +51,6 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
       initial={initial}
       login={{ github: !!config.github(), email: mailConfigured() || config.demo(), demo: config.demo() }}
       returnTo={`/submit?${query}`}
-      termsHref={legalHref("nutzungsbedingungen", locale)}
     />
   );
 }
