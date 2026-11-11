@@ -6,7 +6,7 @@ const text = (name: string) => (process.env[name] || "").trim();
 
 export const config = {
   // Where the database, the packages and the previews live (one volume).
-  dataDir: () => resolve(text("MARKETPLACE_DATA_DIR") || "./data"),
+  dataDir: () => resolve(/*turbopackIgnore: true*/ text("MARKETPLACE_DATA_DIR") || "./data"),
   // The public address of the marketplace, without a trailing slash; links in
   // e-mails and the GitHub callback are built from it.
   publicUrl: () => (text("MARKETPLACE_URL") || "http://localhost:3000").replace(/\/+$/, ""),
@@ -37,7 +37,7 @@ export const config = {
     };
   },
   // Where the legal texts (Markdown) are read from; default <data>/legal.
-  legalDir: () => resolve(text("MARKETPLACE_LEGAL_DIR") || resolve(config.dataDir(), "legal")),
+  legalDir: () => resolve(/*turbopackIgnore: true*/ text("MARKETPLACE_LEGAL_DIR") || resolve(/*turbopackIgnore: true*/ config.dataDir(), "legal")),
 };
 
 // Is the marketplace served over https (cookies get "Secure")?

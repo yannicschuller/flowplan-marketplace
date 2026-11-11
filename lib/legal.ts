@@ -13,10 +13,10 @@ export function legalText(page: LegalPage, locale: Locale): { text: string; plac
   const other: Locale = locale === "de" ? "en" : "de";
   for (const [dir, placeholder] of [
     [config.legalDir(), false],
-    [resolve(process.cwd(), "docs/legal"), true],
+    [resolve(/*turbopackIgnore: true*/ process.cwd(), "docs/legal"), true],
   ] as const)
     for (const l of [locale, other]) {
-      const file = join(dir, `${page}.${l}.md`);
+      const file = join(/*turbopackIgnore: true*/ dir, `${page}.${l}.md`);
       if (existsSync(file)) return { text: readFileSync(file, "utf8").slice(0, 100_000), placeholder };
     }
   return { text: "", placeholder: true };

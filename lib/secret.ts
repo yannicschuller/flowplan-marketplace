@@ -14,7 +14,7 @@ export function secretKey(): Buffer {
   const dir = config.dataDir();
   if (cache.marketplaceSecret?.dir === dir) return cache.marketplaceSecret.key;
   mkdirSync(dir, { recursive: true });
-  const file = join(dir, "secret.key");
+  const file = join(/*turbopackIgnore: true*/ dir, "secret.key");
   let key: Buffer;
   if (existsSync(file)) key = Buffer.from(readFileSync(file, "utf8").trim(), "hex");
   else {

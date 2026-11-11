@@ -136,7 +136,7 @@ export function db(): DatabaseSync {
   if (holder.marketplaceDb?.dir === dir) return holder.marketplaceDb.db;
   holder.marketplaceDb?.db.close();
   mkdirSync(dir, { recursive: true });
-  const conn = new DatabaseSync(join(dir, "marketplace.db"));
+  const conn = new DatabaseSync(join(/*turbopackIgnore: true*/ dir, "marketplace.db"));
   conn.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   migrate(conn);
   holder.marketplaceDb = { db: conn, dir };

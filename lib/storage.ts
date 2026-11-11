@@ -12,7 +12,7 @@ const checkId = (id: string) => {
   if (!ID.test(id)) throw new Error("bad id");
   return id;
 };
-const dir = (...parts: string[]) => join(config.dataDir(), ...parts);
+const dir = (...parts: string[]) => join(/*turbopackIgnore: true*/ config.dataDir(), ...parts);
 const ext = (type: ImageType) => (type === "jpeg" ? "jpg" : type);
 
 function writeAtomic(path: string, data: Uint8Array) {
@@ -30,7 +30,7 @@ export function savePreviews(versionId: string, previews: { n: number; type: Ima
   const folder = dir("previews", checkId(versionId));
   rmSync(folder, { recursive: true, force: true });
   mkdirSync(folder, { recursive: true });
-  for (const p of previews) writeAtomic(join(folder, `${p.n}.${ext(p.type)}`), p.bytes);
+  for (const p of previews) writeAtomic(join(/*turbopackIgnore: true*/ folder, `${p.n}.${ext(p.type)}`), p.bytes);
 }
 export const readPreview = (versionId: string, n: number, type: ImageType) =>
   readFileSync(dir("previews", checkId(versionId), `${Math.trunc(n)}.${ext(type)}`));
