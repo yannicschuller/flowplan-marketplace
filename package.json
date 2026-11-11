@@ -25,7 +25,7 @@
   "dependencies": {
     "@phosphor-icons/react": "2.1.10",
     "next": "16.4.5",
-    "nodemailer": "10.2.1",
+    "nodemailer": "10.4.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "yauzl": "3.4.0",
