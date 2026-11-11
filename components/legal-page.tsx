@@ -1,11 +1,12 @@
 import { pageT } from "@/lib/page";
-import { legalText, type LegalPage as Page } from "@/lib/legal";
+import { termsText } from "@/lib/legal";
 import { parseMarkdown } from "@/lib/markdown";
 import { Markdown } from "./markdown";
 
-export async function LegalPage({ page }: { page: Page }) {
+// The marketplace's own Nutzungsbedingungen (without MARKETPLACE_TERMS_URL).
+export async function LegalPage() {
   const { t, locale } = await pageT();
-  const { text, placeholder } = legalText(page, locale);
+  const { text, placeholder } = termsText(locale);
   return (
     <article className="narrow legal">
       {placeholder && <p className="notice warning">{t("Platzhalter – der Betreiber hat diesen Text noch nicht hinterlegt.", "Placeholder – the operator hasn't provided this text yet.")}</p>}

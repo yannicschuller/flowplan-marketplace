@@ -37,7 +37,7 @@ RUN mkdir /app/data && chown node:node /app/data && chmod 700 /app/data
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
-# Placeholders for the legal pages until data/legal/ has the real texts.
+# Placeholder for the Nutzungsbedingungen until data/legal/ has the real text.
 COPY --from=build /app/docs/legal ./docs/legal
 USER node
 VOLUME ["/app/data"]

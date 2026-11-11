@@ -4,6 +4,29 @@ import { resolve } from "node:path";
 
 const text = (name: string) => (process.env[name] || "").trim();
 
+// Impressum and privacy policy are the Flowplan website's; the marketplace
+// links there. Nutzungsbedingungen have no default address: without
+// MARKETPLACE_TERMS_URL the marketplace shows its own page (lib/legal.ts).
+export const DEFAULT_IMPRESSUM_URL = "https://flowplan.org/impressum";
+export const DEFAULT_PRIVACY_URL = "https://flowplan.org/datenschutz";
+
+// An https address from the environment, or the fallback when unset. Anything
+// else is a configuration error and fails loudly rather than linking nowhere.
+function httpsUrl(name: string, fallback: string): string;
+function httpsUrl(name: string, fallback: null): string | null;
+function httpsUrl(name: string, fallback: string | null) {
+  const value = text(name);
+  if (!value) return fallback;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} is not a valid URL: ${value}`);
+  }
+  if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new Error(`${name} must be an https:// URL: ${value}`);
+  return url.href;
+}
+
 export const config = {
   // Where the database, the packages and the previews live (one volume).
   dataDir: () => resolve(/*turbopackIgnore: true*/ text("MARKETPLACE_DATA_DIR") || "./data"),
@@ -36,7 +59,12 @@ export const config = {
       from,
     };
   },
-  // Where the legal texts (Markdown) are read from; default <data>/legal.
+  // Legal pages (validated https addresses).
+  impressumUrl: () => httpsUrl("MARKETPLACE_IMPRESSUM_URL", DEFAULT_IMPRESSUM_URL),
+  privacyUrl: () => httpsUrl("MARKETPLACE_PRIVACY_URL", DEFAULT_PRIVACY_URL),
+  termsUrl: () => httpsUrl("MARKETPLACE_TERMS_URL", null),
+  // Where the operator's Nutzungsbedingungen (Markdown) are read from when
+  // MARKETPLACE_TERMS_URL is unset; default <data>/legal.
   legalDir: () => resolve(/*turbopackIgnore: true*/ text("MARKETPLACE_LEGAL_DIR") || resolve(/*turbopackIgnore: true*/ config.dataDir(), "legal")),
 };
 
