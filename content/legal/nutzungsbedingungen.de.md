@@ -13,7 +13,7 @@ Im Marketplace teilen Menschen Vorlagen für Flowplan: Dokumente, Datenbanken, W
 - Du meldest dich über GitHub oder einen Anmeldelink per E-Mail an. Gib dabei nur Angaben an, die stimmen, und halte deinen Zugang geschützt.
 - Du musst mindestens 16 Jahre alt sein, um Vorlagen einzureichen.
 - Dein Anzeigename erscheint öffentlich bei deinen Vorlagen. Deine E-Mail-Adresse zeigen wir nicht an.
-- Wenn du dein Konto löschen möchtest, schreib uns an die Adresse aus dem Impressum. Veröffentlichte Vorlagen nehmen wir dann aus dem Marketplace. Kopien, die andere schon heruntergeladen haben, bleiben bei ihnen und dürfen nach der Lizenz weiter genutzt werden.
+- Du kannst dein Konto jederzeit selbst löschen, unter „Meine Einreichungen“ mit „Konto löschen“, oder uns an die Adresse aus dem Impressum schreiben. Dabei löschen wir dein Konto und alle deine Vorlagen mit allen Versionen und Vorschaubildern. Veröffentlichte Vorlagen verschwinden sofort aus dem Marketplace. Kopien, die andere schon heruntergeladen haben, bleiben bei ihnen und dürfen nach der Lizenz weiter genutzt werden.
 
 ## 3. Einreichen von Vorlagen
 
@@ -34,7 +34,7 @@ Mit jeder Einreichung bestätigst du:
 
 - Jede Einreichung und jede neue Version prüfen wir, bevor sie erscheint. Automatische Prüfungen helfen dabei, ersetzen aber nicht die Prüfung durch einen Menschen.
 - Wir können eine Einreichung veröffentlichen, um Änderungen bitten oder ablehnen. Ein Anspruch auf Veröffentlichung besteht nicht.
-- Veröffentlichte Vorlagen können wir zurückziehen, zum Beispiel nach einer berechtigten Meldung, bei Verstößen gegen diese Bedingungen oder wenn eine Vorlage nicht mehr mit Flowplan funktioniert. Wir sagen dir per E-Mail, warum.
+- Veröffentlichte Vorlagen können wir zurückziehen, zum Beispiel nach einer berechtigten Meldung, bei Verstößen gegen diese Bedingungen oder wenn eine Vorlage nicht mehr mit Flowplan funktioniert. Wir sagen dir per E-Mail, warum. Hat dein Konto keine E-Mail-Adresse (Anmeldung über GitHub), steht der Grund unter „Meine Einreichungen“.
 - Deine eigenen Einreichungen kannst du jederzeit zurückziehen.
 
 ## 6. Melden
@@ -60,7 +60,7 @@ Der Marketplace ist ein kostenloses Angebot.
 
 ## 10. Änderungen dieser Bedingungen
 
-Wir können diese Bedingungen ändern, wenn sich der Marketplace oder die Rechtslage ändert. Über wesentliche Änderungen informieren wir Konten mit Einreichungen vorab per E-Mail. Wenn du nicht einverstanden bist, kannst du deine Vorlagen zurückziehen und dein Konto löschen lassen.
+Wir können diese Bedingungen ändern, wenn sich der Marketplace oder die Rechtslage ändert. Über wesentliche Änderungen informieren wir Konten mit Einreichungen vorab per E-Mail. Wenn du nicht einverstanden bist, kannst du deine Vorlagen zurückziehen und dein Konto löschen.
 
 ## 11. Schlussbestimmungen
 

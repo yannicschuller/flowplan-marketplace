@@ -13,7 +13,7 @@ The Marketplace is where people share templates for Flowplan: documents, databas
 - You sign in with GitHub or with a sign-in link sent by e-mail. Only give details that are true, and keep your access safe.
 - You must be at least 16 years old to submit templates.
 - Your display name is shown publicly with your templates. We don't show your e-mail address.
-- If you want your account deleted, write to the address in the legal notice. We will then remove your published templates from the Marketplace. Copies that others have already downloaded stay with them and may still be used under the licence.
+- You can delete your account yourself at any time, under "My submissions" with "Delete account", or write to the address in the legal notice. This deletes your account and all your templates with every version and preview image. Published templates disappear from the Marketplace at once. Copies that others have already downloaded stay with them and may still be used under the licence.
 
 ## 3. Submitting templates
 
@@ -34,7 +34,7 @@ With every submission you confirm that:
 
 - We review every submission and every new version before it appears. Automatic checks help, but they don't replace review by a person.
 - We may publish a submission, ask for changes or reject it. There is no right to publication.
-- We may unpublish a published template. Reasons include a justified report, a breach of these terms, or a template that no longer works with Flowplan. We will tell you why by e-mail.
+- We may unpublish a published template. Reasons include a justified report, a breach of these terms, or a template that no longer works with Flowplan. We will tell you why by e-mail. If your account has no e-mail address (sign-in with GitHub), the reason is shown under "My submissions".
 - You can withdraw your own submissions at any time.
 
 ## 6. Reporting
@@ -60,7 +60,7 @@ The Marketplace is a free service.
 
 ## 10. Changes to these terms
 
-We may change these terms when the Marketplace or the law changes. We will tell accounts with submissions about significant changes in advance by e-mail. If you don't agree, you can withdraw your templates and have your account deleted.
+We may change these terms when the Marketplace or the law changes. We will tell accounts with submissions about significant changes in advance by e-mail. If you don't agree, you can withdraw your templates and delete your account.
 
 ## 11. Final provisions
 

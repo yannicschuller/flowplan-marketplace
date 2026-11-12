@@ -27,6 +27,8 @@ import {
 } from "./auth";
 import { randomToken, safeEqual } from "./secret";
 import { KINDS, CATEGORIES } from "./catalog";
+import { deleteAccount } from "./account";
+import { audit } from "./admin";
 
 // ---- Public API (CORS * for GET) ----
 
@@ -173,6 +175,26 @@ export async function profileRoute(request: Request) {
   const body = await readJson(request, 4096);
   renameUser(user.id, String(body.name ?? ""));
   return json({ ok: true });
+}
+
+// "Konto löschen" on /me: a plain form POST (no script needed) with the
+// session's CSRF token and the handle typed again as confirmation. The
+// session is checked again here; on success the cookie is cleared.
+export async function deleteAccountRoute(request: Request) {
+  requireSameOrigin(request);
+  const form = await request.formData().catch(() => null);
+  const field = (name: string) => (typeof form?.get(name) === "string" ? (form!.get(name) as string) : "");
+  let user;
+  try {
+    user = requireUser(request, field("csrf"));
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "signed_out") return redirect("/login?next=/me");
+    throw error;
+  }
+  const typed = field("confirm").trim().replace(/^@/, "").toLowerCase();
+  if (typed !== user.handle.toLowerCase()) return redirect("/me?delete=1&error=confirm#delete");
+  await deleteAccount(user, { actor: "author (self-service)", audit });
+  return redirect("/?account=deleted", [clearSessionCookie()]);
 }
 
 // ---- Sign-in ----
