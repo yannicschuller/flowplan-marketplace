@@ -15,6 +15,7 @@ import { IMAGE_MIME } from "./images";
 import { sendMail } from "./mail";
 import { deleteAccount, requireDeletableUser } from "./account";
 import { requireSecurityClearance, rescan, securityOf, securitySummaryOf } from "./security-store";
+import { addPreviews, adminEdit, orderPreviews, removePreview, replacePackage, type AdminEdit, type EditScope } from "./admin-edit";
 import type { Analysis, Finding } from "./package";
 import type { User } from "./auth";
 
@@ -49,8 +50,10 @@ type VersionWithTemplate = VersionRow & {
   published_version_id: string | null;
   unpublished_at: number | null;
   withdrawn_at: number | null;
+  admin_overrides: string;
 };
-const SELECT_VERSION = "SELECT v.*, t.slug, t.kind, t.author_id, t.published_version_id, t.unpublished_at, t.withdrawn_at FROM versions v JOIN templates t ON t.id=v.template_id";
+const SELECT_VERSION =
+  "SELECT v.*, t.slug, t.kind, t.author_id, t.published_version_id, t.unpublished_at, t.withdrawn_at, t.admin_overrides FROM versions v JOIN templates t ON t.id=v.template_id";
 
 const iso = (at: number | null | undefined) => (at ? new Date(at).toISOString() : null);
 const templateState = (t: { published_version_id: string | null; unpublished_at: number | null; withdrawn_at: number | null }) =>
@@ -105,6 +108,10 @@ function submissionSummary(v: VersionWithTemplate) {
     packageUrl: `${adminBase()}/submissions/${v.id}/package`,
     // The stored security scan (README, "Security scan"); null until it ran.
     security: securitySummaryOf(v.id),
+    // Edits made in flowplan-admin (README "Editing as admin").
+    adminEdits: parseJsonColumn<AdminEdit[]>(v.admin_edits, []).map((e) => ({ ...e, at: iso(e.at) })),
+    // Official templates: the fields an admin set that the next seed keeps.
+    adminOverrides: Object.keys(parseJsonColumn<Record<string, unknown>>(v.admin_overrides, {})),
   };
 }
 
@@ -286,6 +293,7 @@ export function listTemplates(state: string | null) {
           downloads: t.downloads,
           opens: t.opens,
           official: author.official,
+          adminOverrides: Object.keys(parseJsonColumn<Record<string, unknown>>(t.admin_overrides, {})),
           author,
           publishedAt: iso(t.published_at),
           url: `${config.publicUrl()}/t/${t.slug}`,
@@ -296,7 +304,7 @@ export function listTemplates(state: string | null) {
 
 // E-mail to the author of a template, if an address is known (GitHub-only
 // accounts see the same on /me). false when nothing was sent.
-async function mailAuthor(authorId: string, subject: [string, string], body: [string[], string[]]) {
+export async function mailAuthor(authorId: string, subject: [string, string], body: [string[], string[]]) {
   const author = authorOf(authorId);
   if (!author.email || author.official) return false;
   return sendMail({
@@ -454,8 +462,17 @@ export async function adminRoute(request: Request, path: string[]): Promise<Resp
   const actor = requireAdmin(request);
   const method = request.method;
   const url = new URL(request.url);
-  const [a, b, c, d] = path;
-  const body = async () => (method === "POST" ? await readJson(request) : {});
+  const [a, b, c, d, e] = path;
+  const body = async () => (method === "POST" || method === "PATCH" ? await readJson(request, 128 * 1024) : {});
+  // Editing (lib/admin-edit.ts): the same endpoints for a published template and a submission in review.
+  const scope: EditScope | null = a === "templates" ? "template" : a === "submissions" ? "submission" : null;
+  if (scope && b && !e) {
+    if (method === "PATCH" && !c) return json(await adminEdit(scope, b, await body(), actor));
+    if (method === "POST" && c === "previews" && !d) return json(await addPreviews(scope, b, request, actor));
+    if (method === "POST" && c === "previews" && d === "order") return json(await orderPreviews(scope, b, await body(), actor));
+    if (method === "DELETE" && c === "previews" && d && /^[1-9]$/.test(d)) return json(await removePreview(scope, b, Number(d), actor));
+    if (method === "POST" && c === "package" && !d) return json(await replacePackage(scope, b, request, actor));
+  }
   if (method === "GET" && a === "submissions" && !b) return json(listSubmissions(url.searchParams.get("status")));
   if (method === "GET" && a === "submissions" && b && !c) return json(await submissionDetail(b, actor));
   if (method === "GET" && a === "submissions" && b && c === "package" && !d) return submissionPackage(b);

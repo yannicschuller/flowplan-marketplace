@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { pageT } from "@/lib/page";
 import { config } from "@/lib/config";
-import { parseJsonColumn, publicTemplate, publishedVersions, type PreviewInfo } from "@/lib/store";
+import { movedSlug, parseJsonColumn, publicTemplate, publishedVersions, type PreviewInfo } from "@/lib/store";
 import { LICENSE_URLS, categoryLabel, kindLabel, languageLabel, licenseLabel, type License } from "@/lib/catalog";
 import { formatBytes, formatDate, localized } from "@/lib/i18n";
 import type { Analysis } from "@/lib/package";
@@ -34,8 +34,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function TemplatePage({ params }: Props) {
   const { t, locale } = await pageT();
-  const row = publicTemplate((await params).slug);
-  if (!row) notFound();
+  const { slug } = await params;
+  const row = publicTemplate(slug);
+  if (!row) {
+    // Renamed in flowplan-admin: the old address leads to the new one (308).
+    const to = movedSlug(slug);
+    if (to) permanentRedirect(`/t/${encodeURIComponent(to)}`);
+    notFound();
+  }
   const previews = parseJsonColumn<PreviewInfo[]>(row.previews, []);
   const tags = parseJsonColumn<string[]>(row.tags, []);
   const analysis = parseJsonColumn<Analysis>(row.analysis, {});
@@ -101,7 +107,7 @@ export default async function TemplatePage({ params }: Props) {
         <div className={`gallery count-${previews.length}`}>
           {previews.map((p, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={p.n} src={previewSrc(row.slug, row.number, p.n)} alt={t(`Vorschau ${i + 1} von „${row.title}“`, `Preview ${i + 1} of "${row.title}"`)} width={960} height={600} />
+            <img key={p.n} src={previewSrc(row.slug, row, p.n)} alt={t(`Vorschau ${i + 1} von „${row.title}“`, `Preview ${i + 1} of "${row.title}"`)} width={960} height={600} />
           ))}
         </div>
       )}

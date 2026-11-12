@@ -11,6 +11,10 @@
 //   template unpublished by an admin → left alone (never published again)
 //   package fails the checks     → skipped with a warning; the rest goes on
 // A file that disappears leaves its template as it is.
+//
+// Metadata an admin edited in flowplan-admin (templates.admin_overrides,
+// lib/admin-edit.ts) wins over template.json in every later version, and
+// previews an admin changed stay; the payload always comes from the file.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -19,8 +23,10 @@ import { OFFICIAL_HANDLE, type User } from "./auth";
 import { audit } from "./admin";
 import { HttpError } from "./http";
 import { LICENSES } from "./catalog";
-import { inspectPackage, PACKAGE_EXTENSION, type Inspection } from "./package";
-import { insertVersion, nextVersionNumber, parseSubmissionForm, store, uniqueSlug, versionFields, type TemplateRow } from "./store";
+import { inspectPackage, PACKAGE_EXTENSION, type Inspection, type Preview } from "./package";
+import { readPreview } from "./storage";
+import type { PreviewInfo, SubmissionForm, VersionRow } from "./store";
+import { insertVersion, nextVersionNumber, parseJsonColumn, parseSubmissionForm, slugInUse, store, uniqueSlug, versionFields, type TemplateRow } from "./store";
 
 export const OFFICIAL_ACTOR = "seed";
 export const OFFICIAL_NAME = "Flowplan";
@@ -77,6 +83,34 @@ function formOf(inspection: Inspection) {
   });
 }
 
+// What an admin set on the template (lib/admin-edit.ts) on top of the file's
+// metadata; "previews": the current version's previews instead of the file's.
+const OVERRIDE_FIELDS: Record<string, keyof SubmissionForm> = {
+  title: "title",
+  "summary.de": "summaryDe",
+  "summary.en": "summaryEn",
+  "description.de": "descriptionDe",
+  "description.en": "descriptionEn",
+  category: "category",
+  tags: "tags",
+  language: "language",
+  minVersion: "minVersion",
+};
+function applyOverrides(template: TemplateRow, form: SubmissionForm, inspection: Inspection): { form: SubmissionForm; inspection: Inspection; fields: string[] } {
+  const overrides = parseJsonColumn<Record<string, unknown>>(template.admin_overrides, {});
+  const fields = Object.keys(overrides).filter((k) => k in OVERRIDE_FIELDS || k === "previews");
+  if (!fields.length) return { form, inspection, fields };
+  const input: Record<string, unknown> = { ...form };
+  for (const k of fields) if (k in OVERRIDE_FIELDS) input[OVERRIDE_FIELDS[k]] = overrides[k];
+  let next = inspection;
+  if (overrides.previews && template.published_version_id) {
+    const current = one<VersionRow>("SELECT * FROM versions WHERE id=?", template.published_version_id);
+    const previews: Preview[] = parseJsonColumn<PreviewInfo[]>(current?.previews ?? "[]", []).map((p) => ({ n: p.n, type: p.type, bytes: readPreview(current!.id, p.n, p.type) }));
+    next = { ...inspection, previews };
+  }
+  return { form: parseSubmissionForm(input), inspection: next, fields };
+}
+
 export function officialFiles(dir = officialDir()): string[] {
   let names: string[];
   try {
@@ -125,15 +159,22 @@ async function seedFile(dir: string, file: string): Promise<SeedOutcome> {
     const created = !template;
     if (!template) {
       const id = newId();
-      const slug = one("SELECT 1 FROM templates WHERE slug=?", key) ? uniqueSlug(key) : key;
+      const slug = slugInUse(key) ? uniqueSlug(key) : key;
       run("INSERT INTO templates(id,slug,author_id,kind,created_at,updated_at,official_key) VALUES(?,?,?,?,?,?,?)", id, slug, author.id, kind, at, at, key);
       template = known()!;
     }
     const version = { id: newId(), number: nextVersionNumber(template.id) };
-    const stored = store(version, template, author, inspection, form);
-    insertVersion(version, template.id, versionFields(form, inspection, stored), "published", at);
+    const kept = applyOverrides(template, form, inspection);
+    const stored = store(version, template, author, kept.inspection, kept.form);
+    insertVersion(version, template.id, versionFields(kept.form, kept.inspection, stored), "published", at);
     run("UPDATE templates SET published_version_id=?,published_at=COALESCE(published_at,?),official_sha256=?,updated_at=? WHERE id=?", version.id, at, sha, at, template.id);
-    audit(OFFICIAL_ACTOR, created ? "official_created" : "official_updated", template.id, { file, slug: template.slug, number: version.number, sha256: sha });
+    audit(OFFICIAL_ACTOR, created ? "official_created" : "official_updated", template.id, {
+      file,
+      slug: template.slug,
+      number: version.number,
+      sha256: sha,
+      ...(kept.fields.length ? { adminOverrides: kept.fields } : {}),
+    });
     return out(created ? "created" : "updated", { slug: template.slug, version: version.number });
   });
 }

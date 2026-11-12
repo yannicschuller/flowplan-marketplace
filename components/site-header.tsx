@@ -11,14 +11,14 @@ export async function SiteHeader() {
       <div className="bar">
         <Link href="/" className="brand">
           <BrandMark />
-          <span>Flowplan</span>
+          <span className="brand-name">Flowplan</span>
           <small>Marketplace</small>
         </Link>
         <nav className="nav" aria-label={t("Hauptnavigation", "Main navigation")}>
           <Link href="/#browse">{t("Entdecken", "Browse")}</Link>
-          <Link href="/submit" className="nav-submit">
+          <Link href="/submit" className="nav-submit" title={t("Einreichen", "Submit")}>
             <Plus size={15} weight="bold" aria-hidden="true" />
-            <span>{t("Einreichen", "Submit")}</span>
+            <span className="nav-label">{t("Einreichen", "Submit")}</span>
           </Link>
           {session ? (
             <Link href="/me" className="nav-me" title={session.user.name}>

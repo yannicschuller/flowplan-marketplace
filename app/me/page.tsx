@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { pageSession, pageT } from "@/lib/page";
-import { findingsOf, mySubmissions } from "@/lib/store";
+import { findingsOf, mySubmissions, parseJsonColumn } from "@/lib/store";
+import { fieldLabels, type AdminEdit } from "@/lib/edit-labels";
 import { canTransition, statusLabel } from "@/lib/status";
 import { kindLabel } from "@/lib/catalog";
 import { formatDate } from "@/lib/i18n";
@@ -127,6 +128,15 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
                             {v.decided_at ? <span className="muted"> ({formatDate(locale, v.decided_at)})</span> : null} {v.review_message}
                           </p>
                         )}
+                        {parseJsonColumn<AdminEdit[]>(v.admin_edits, [])
+                          .filter((e) => e.notify)
+                          .map((e, i) => (
+                            <p key={`edit-${i}`} className="review-message admin-edit">
+                              <strong>{t("Vom Prüfteam angepasst:", "Adjusted by the review team:")}</strong> {fieldLabels(e.fields, locale)}
+                              <span className="muted"> ({formatDate(locale, e.at)})</span>
+                              {e.message ? ` – ${e.message}` : ""}
+                            </p>
+                          ))}
                         {findings.length > 0 && (
                           <ul className="findings compact">
                             {findings.map((f, i) => (

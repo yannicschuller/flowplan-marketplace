@@ -179,3 +179,38 @@ export async function rescanOutdated(log: (message: string) => void = () => {}) 
   if (n) log(`Security scan: ${n} version(s) scanned (scanner ${SCANNER_VERSION}).`);
   return n;
 }
+
+// A package an admin uploads to replace one (lib/admin-edit.ts): scanned
+// before it is stored. Replacing the package of a published template
+// publishes it at once, so a block verdict needs securityOverride there –
+// like publishing a submission. Returns the scan and the reason to record.
+export async function scanReplacement(bytes: Uint8Array, publishes: boolean, reason: unknown) {
+  const report = await scanPackage(bytes);
+  const text = typeof reason === "string" ? reason.trim().slice(0, 2000) : "";
+  if (publishes && report.verdict === "block" && text.length < 10)
+    throw new HttpError(
+      409,
+      "security_blocked",
+      `The security scan blocks this package (${report.counts.block} finding(s)). Replacing a published package needs securityOverride: a reason of at least 10 characters.`,
+      { security: report },
+    );
+  return { report, override: publishes && report.verdict === "block" ? text : null };
+}
+
+// After the replacement is stored: the version's scan (of the stored bytes)
+// and, if one was needed, the reviewer's override for exactly these bytes.
+export async function recordReplacement(
+  versionId: string,
+  override: string | null,
+  actor: string,
+  audit: (actor: string, action: string, target: string, details?: Record<string, unknown>) => void,
+) {
+  const security = await securityOf(versionId, { force: true });
+  if (security && override && security.verdict === "block") {
+    const at = now();
+    run("UPDATE security_scans SET override_reason=?,override_by=?,override_at=?,override_sha256=sha256 WHERE version_id=?", override, actor, at, versionId);
+    audit(actor, "security_override", versionId, { reason: override, sha256: security.sha256, scannerVersion: security.scannerVersion, blocking: security.findings.filter((f) => f.severity === "block").map((f) => f.code), via: "package_replaced" });
+    return securityOf(versionId);
+  }
+  return security;
+}

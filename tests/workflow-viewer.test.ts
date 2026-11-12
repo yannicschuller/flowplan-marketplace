@@ -179,10 +179,28 @@ const OFFICIAL_SUMMARIES: Record<string, { trigger: string; steps: number; de: R
   "workflow-webhook-record.flowplan-template": { trigger: "Eingehender Webhook", steps: 1, de: [/wird von außen aufgerufen/], en: [/is called from outside/], gaps: ["Datenbank"] },
   "workflow-weekly-report.flowplan-template": { trigger: "Freitags 15:00", steps: 4, de: [/Zeitplan/, /„Im Chat posten“ \(Chat-Nachricht\) – spricht einen externen Dienst an/], en: [/Schedule/, /talks to an external service/], gaps: ["Berichte ablegen unter"] },
 };
-test("summary: the six official workflows in plain language, German and English", async () => {
+test("summary: every official workflow in plain language, German and English", async () => {
   const files = readdirSync(OFFICIAL).filter((f) => f.startsWith("workflow-"));
-  assert.deepEqual(files.sort(), Object.keys(OFFICIAL_SUMMARIES).sort());
-  for (const file of files) {
+  // The six described in detail below are there; every other official
+  // workflow gets the same general checks.
+  for (const known of Object.keys(OFFICIAL_SUMMARIES)) assert.ok(files.includes(known), known);
+  for (const file of files.filter((f) => !OFFICIAL_SUMMARIES[f])) {
+    const entries = await official(file);
+    assert.ok(entries.has(WORKFLOW_META_PATH), `${file}: has workflow-meta.json`);
+    for (const locale of ["de", "en"] as const) {
+      const data = viewerFromEntries(entries, "payload/workflow.json", locale)!;
+      const s = data.view.summary;
+      assert.ok(data.view.hasMeta, file);
+      assert.ok(s.lead.startsWith(locale === "de" ? "Startet mit „" : "Starts with “"), `${file} ${locale}: ${s.lead}`);
+      assert.ok(s.steps.length > 0, `${file} ${locale}: steps`);
+      assert.doesNotMatch(summaryText(s), /\$ask:|n_[a-z0-9]{4,}|undefined|\[object/, `${file} ${locale}`);
+      for (const n of data.view.nodes) {
+        assert.notEqual(n.name, n.type, `${file}: ${n.type} named`);
+        assert.ok(n.icon, `${file}: ${n.type} symbol`);
+      }
+    }
+  }
+  for (const file of Object.keys(OFFICIAL_SUMMARIES)) {
     const expected = OFFICIAL_SUMMARIES[file];
     const entries = await official(file);
     assert.ok(entries.has(WORKFLOW_META_PATH), `${file}: has workflow-meta.json`);
