@@ -11,6 +11,7 @@ import { DEFAULT_ZIP_LIMITS, ZipError, readZip, writeZip } from "./zip";
 import { IMAGE_MIME, claimedImageType, sniffFont, sniffImage, type ImageType } from "./images";
 import { containsHtml } from "./markdown";
 import { LIMITS } from "./limits";
+import { readWorkflowMeta, WORKFLOW_META_PATH } from "./workflow-meta";
 
 export const PACKAGE_FORMAT = "flowplan-marketplace-1";
 export const PACKAGE_EXTENSION = ".flowplan-template";
@@ -54,6 +55,8 @@ export type WorkflowAnalysis = {
   email: boolean;
   webhooks: boolean;
   secretWarnings: number;
+  // payload/workflow-meta.json present and readable (names and symbols for the viewer).
+  meta?: boolean;
 };
 export type Analysis = {
   kind?: Kind;
@@ -275,6 +278,20 @@ async function checkPayload(manifest: Manifest, payload: Buffer, entries: Map<st
       if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return bad("payload-graph", "Workflow ohne Knoten oder Verbindungen.", "Workflow without nodes or edges.");
       const workflow = analyzeWorkflow(graph.nodes as unknown[], data);
       analysis.workflow = workflow;
+      // The viewer's names and symbols (optional; older packages have none).
+      const metaBytes = entries.get(WORKFLOW_META_PATH);
+      if (metaBytes) {
+        const meta = readWorkflowMeta(metaBytes);
+        workflow.meta = !!meta.meta;
+        const metaJson = parseJson(metaBytes);
+        if (metaJson.ok) workflow.secretWarnings += analyzeWorkflow([], metaJson.value).secretWarnings;
+        if (!meta.meta)
+          findings.push(finding("warning", "workflow-meta-invalid", "workflow-meta.json ist ungültig – die Vorschau zeigt die technischen Schritt-Typen.", "workflow-meta.json is invalid – the preview shows the technical step types.", WORKFLOW_META_PATH));
+        else if (meta.problems.includes("icon"))
+          findings.push(finding("warning", "workflow-meta-icon", "Ein Symbol in workflow-meta.json ist kein reiner SVG-Pfad und wird nicht gezeigt.", "A symbol in workflow-meta.json is not plain SVG path data and is not shown.", WORKFLOW_META_PATH));
+        else if (meta.problems.length)
+          findings.push(finding("warning", "workflow-meta-partial", "Teile von workflow-meta.json sind ungültig und werden nicht gezeigt.", "Parts of workflow-meta.json are invalid and are not shown.", WORKFLOW_META_PATH));
+      } else workflow.meta = false;
       if (!workflow.nodeCount) bad("payload-graph", "Workflow ist leer.", "Workflow is empty.");
       if (workflow.secretWarnings)
         findings.push(finding("warning", "secret-like", `${workflow.secretWarnings} Wert(e) sehen aus wie Zugangsdaten – bitte entfernen.`, `${workflow.secretWarnings} value(s) look like credentials – please remove them.`, at));

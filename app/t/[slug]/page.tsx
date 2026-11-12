@@ -19,6 +19,9 @@ import { Globe } from "@phosphor-icons/react/dist/ssr/Globe";
 import { Robot } from "@phosphor-icons/react/dist/ssr/Robot";
 import { EnvelopeSimple } from "@phosphor-icons/react/dist/ssr/EnvelopeSimple";
 import { Lock } from "@phosphor-icons/react/dist/ssr/Lock";
+import { versionViewer } from "@/lib/workflow-viewer";
+import { WorkflowViewer } from "@/components/workflow-viewer";
+import { WorkflowSummary } from "@/components/workflow-summary";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -41,6 +44,7 @@ export default async function TemplatePage({ params }: Props) {
   const description = wanted || row.description_de || row.description_en;
   const otherLanguage = !wanted && !!description;
   const wf = analysis.workflow;
+  const viewer = row.kind === "workflow" ? await versionViewer(row, locale) : null;
   const number = (n: number) => n.toLocaleString(locale === "de" ? "de-DE" : "en-GB");
 
   return (
@@ -102,6 +106,13 @@ export default async function TemplatePage({ params }: Props) {
         </div>
       )}
 
+      {viewer && (
+        <section className="workflow-view" aria-labelledby="workflow-view-title">
+          <h2 id="workflow-view-title">{t("Ablauf ansehen", "Look at the flow")}</h2>
+          <WorkflowViewer data={viewer} />
+        </section>
+      )}
+
       <div className="template-body">
         <div className="template-main">
           {description ? (
@@ -116,11 +127,14 @@ export default async function TemplatePage({ params }: Props) {
           {wf && (
             <section className="box">
               <h2>{t("Was dieser Workflow tut", "What this workflow does")}</h2>
+              {viewer && <WorkflowSummary view={viewer.view} t={t} />}
               <ul className="facts">
-                <li className="plain">
-                  {t(`${wf.nodeCount} Schritte`, `${wf.nodeCount} steps`)}
-                  {wf.triggers.length ? ` · ${t("startet bei", "starts on")} ${wf.triggers.map((x) => x.replace(/^trigger\./, "")).join(", ")}` : ""}
-                </li>
+                {!viewer && (
+                  <li className="plain">
+                    {t(`${wf.nodeCount} Schritte`, `${wf.nodeCount} steps`)}
+                    {wf.triggers.length ? ` · ${t("startet bei", "starts on")} ${wf.triggers.map((x) => x.replace(/^trigger\./, "")).join(", ")}` : ""}
+                  </li>
+                )}
                 {wf.hosts.length > 0 && (
                   <li>
                     <Globe size={15} aria-hidden="true" />

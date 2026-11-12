@@ -17,6 +17,9 @@ import { Info } from "@phosphor-icons/react/dist/ssr/Info";
 import { XCircle } from "@phosphor-icons/react/dist/ssr/XCircle";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
+import { WorkflowViewer } from "./workflow-viewer";
+import { WorkflowSummary } from "./workflow-summary";
+import type { ViewerData } from "@/lib/workflow-viewer";
 
 export type Fields = {
   title: string;
@@ -43,6 +46,8 @@ type Inspection = {
   findings: Finding[];
   size: number;
   previews: { n: number; type: string; data: string }[];
+  // A workflow's diagram and summary (lib/workflow-viewer.ts).
+  viewer?: ViewerData | null;
 };
 
 const EMPTY: Fields = { title: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
@@ -269,6 +274,13 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
           <p className="notice success">
             <CheckCircle size={16} aria-hidden="true" /> {t("Paket in Ordnung.", "Package looks good.")}
           </p>
+        )}
+        {inspection?.viewer && (
+          <div className="workflow-view submit-workflow">
+            <h3>{t("So sieht der Ablauf aus", "This is the flow")}</h3>
+            <WorkflowViewer data={inspection.viewer} />
+            <WorkflowSummary view={inspection.viewer.view} t={t} />
+          </div>
         )}
         {previewUrls.length > 0 && (
           <div className="preview-strip">
