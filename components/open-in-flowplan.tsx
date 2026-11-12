@@ -4,14 +4,17 @@
 // window and origin, warns if the instance is older than the template's
 // minVersion, then posts the package bytes to that origin only. The instance
 // address stays in this browser (localStorage); the marketplace never learns it.
+// Before an instance is saved, the configured default instance
+// (MARKETPLACE_DEFAULT_INSTANCE, app.flowplan.org) is offered as one button.
 import { useEffect, useRef, useState } from "react";
 import { useT } from "./i18n";
 import { checkInstanceUrl, importAddress, instanceTooOld, parseInstanceReady, templateMessage } from "@/lib/handover";
+import { INSTANCE_CHANGED_EVENT, INSTANCE_EDIT_EVENT, boxMode, hostOf, readSavedInstance, writeSavedInstance } from "@/lib/instance";
+import { InstanceForm } from "./instance-form";
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr/ArrowSquareOut";
 import { Warning } from "@phosphor-icons/react/dist/ssr/Warning";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 
-const STORAGE_KEY = "flowplan-marketplace.instance";
 const ANSWER_TIMEOUT_MS = 90_000;
 
 type TemplateInfo = { id: string; slug: string; version: number; minVersion: string; sha256: string; title: string; kind: string; author: string; license: string };
@@ -27,45 +30,55 @@ async function sha256Hex(bytes: ArrayBuffer) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function OpenInFlowplan({ template }: { template: TemplateInfo }) {
+export function OpenInFlowplan({ template, defaultInstance }: { template: TemplateInfo; defaultInstance: string | null }) {
   const t = useT();
-  const [instance, setInstance] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
   const [state, setState] = useState<State>({ step: "idle" });
+  const box = useRef<HTMLDivElement>(null);
   const cleanup = useRef<(() => void) | null>(null);
   const proceed = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && checkInstanceUrl(saved).ok) setInstance(saved);
-    } catch {}
-    return () => cleanup.current?.();
+    setSaved(readSavedInstance());
+    // Another part of the page (the "Instanz übernommen" notice) changed or
+    // wants to change the instance.
+    const onChanged = (e: Event) => {
+      setSaved((e as CustomEvent<string | null>).detail);
+      setEditing(false);
+    };
+    const onEdit = (e: Event) => {
+      e.preventDefault();
+      setEditing(true);
+      box.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    };
+    window.addEventListener(INSTANCE_CHANGED_EVENT, onChanged);
+    window.addEventListener(INSTANCE_EDIT_EVENT, onEdit);
+    return () => {
+      window.removeEventListener(INSTANCE_CHANGED_EVENT, onChanged);
+      window.removeEventListener(INSTANCE_EDIT_EVENT, onEdit);
+      cleanup.current?.();
+    };
   }, []);
 
-  const draftCheck = draft ? checkInstanceUrl(draft) : null;
-  const instanceCheck = instance ? checkInstanceUrl(instance) : null;
-
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    const check = checkInstanceUrl(draft);
-    if (!check.ok) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, check.origin);
-    } catch {}
-    setInstance(check.origin);
-    setEditing(false);
-  }
+  const mode = boxMode(saved, defaultInstance, editing);
+  const target = mode === "saved" ? saved : mode === "default" ? defaultInstance : null;
+  const targetCheck = target ? checkInstanceUrl(target) : null;
+  const defaultHost = defaultInstance ? hostOf(defaultInstance) : null;
 
   function open() {
-    if (!instanceCheck?.ok) {
-      setDraft(instance ?? "");
+    if (!targetCheck?.ok) {
       setEditing(true);
       return;
     }
+    // The default instance counts as chosen from now on: next time the box
+    // shows the compact "In <host> öffnen · ändern".
+    if (mode === "default") {
+      writeSavedInstance(targetCheck.origin);
+      setSaved(targetCheck.origin);
+    }
     cleanup.current?.();
-    const origin = instanceCheck.origin;
+    const origin = targetCheck.origin;
     // Opened right in the click (popup blockers); the window must keep its
     // opener, so no "noopener".
     const win = window.open(importAddress(origin), "_blank");
@@ -137,7 +150,6 @@ export function OpenInFlowplan({ template }: { template: TemplateInfo }) {
     cleanup.current = stop;
   }
 
-  const host = instanceCheck?.ok ? new URL(instanceCheck.origin).host : null;
   const errorText = (reason: string) =>
     ({
       popup: t("Dein Browser hat das neue Fenster blockiert. Erlaube Pop-ups für diese Seite und versuch es noch einmal.", "Your browser blocked the new window. Allow pop-ups for this site and try again."),
@@ -150,52 +162,83 @@ export function OpenInFlowplan({ template }: { template: TemplateInfo }) {
       checksum: t("Die geladene Datei stimmt nicht mit der Prüfsumme überein – abgebrochen.", "The downloaded file does not match its checksum – cancelled."),
     })[reason] ?? reason;
 
+  const openLabel = (host: string) => (state.step === "waiting" ? t("Warte auf Flowplan …", "Waiting for Flowplan …") : t(`In ${host} öffnen`, `Open in ${host}`));
+
   return (
-    <div className="open-flowplan">
-      {editing || !instance ? (
-        <form className="instance-form" onSubmit={save}>
-          <label htmlFor="instance">{t("In Flowplan öffnen", "Open in Flowplan")}</label>
-          <p className="hint">{t("Gib einmal die Adresse deiner Flowplan-Instanz an:", "Enter the address of your Flowplan instance once:")}</p>
-          <div className="row">
-            <input id="instance" type="url" inputMode="url" placeholder="https://flowplan.example.org" value={draft} onChange={(e) => setDraft(e.target.value)} autoComplete="url" required />
-            <button type="submit" className="button primary" disabled={!draftCheck?.ok}>
-              {t("Speichern", "Save")}
-            </button>
-          </div>
-          {draftCheck && !draftCheck.ok && draft.length > 3 && (
-            <p className="field-error">
-              {draftCheck.error === "http-public"
-                ? t("Bitte eine https-Adresse – http nur für localhost und private Netze.", "Please use an https address – http only for localhost and private networks.")
-                : t("Das ist keine gültige Adresse.", "That's not a valid address.")}
+    <div className="open-flowplan" ref={box}>
+      {mode === "field" ? (
+        <InstanceForm
+          key={saved ?? ""}
+          id="instance"
+          title={t("In Flowplan öffnen", "Open in Flowplan")}
+          hint={t("Gib einmal die Adresse deiner Flowplan-Instanz an:", "Enter the address of your Flowplan instance once:")}
+          initial={saved ?? ""}
+          focus={editing}
+          onSave={(origin) => {
+            writeSavedInstance(origin);
+            setSaved(origin);
+            setEditing(false);
+          }}
+        >
+          {editing && (
+            <p className="instance-line">
+              {defaultInstance && saved !== defaultInstance ? (
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    // Back to the preselected instance: forget the own one.
+                    if (saved) writeSavedInstance(null);
+                    setSaved(null);
+                    setEditing(false);
+                  }}
+                >
+                  {saved ? t(`Stattdessen ${defaultHost} verwenden`, `Use ${defaultHost} instead`) : t(`Zurück zu ${defaultHost}`, `Back to ${defaultHost}`)}
+                </button>
+              ) : null}
+              {saved && defaultInstance && saved !== defaultInstance && <span aria-hidden="true"> · </span>}
+              {saved && (
+                <button type="button" className="link" onClick={() => setEditing(false)}>
+                  {t("Abbrechen", "Cancel")}
+                </button>
+              )}
+              {saved && !defaultInstance && (
+                <>
+                  <span aria-hidden="true"> · </span>
+                  <button
+                    type="button"
+                    className="link"
+                    onClick={() => {
+                      writeSavedInstance(null);
+                      setSaved(null);
+                      setEditing(false);
+                    }}
+                  >
+                    {t("Adresse vergessen", "Forget address")}
+                  </button>
+                </>
+              )}
             </p>
           )}
-          {draftCheck?.ok && draftCheck.warning && (
-            <p className="field-warning">
-              <Warning size={14} aria-hidden="true" /> {t("Unverschlüsselte Verbindung (http) – nur im eigenen Netz verwenden.", "Unencrypted connection (http) – only use this on your own network.")}
-            </p>
-          )}
-          <p className="hint">{t("Bleibt nur in diesem Browser gespeichert – der Marketplace erfährt sie nie.", "Only stored in this browser – the marketplace never learns it.")}</p>
-        </form>
+        </InstanceForm>
       ) : (
         <>
           <button type="button" className="button primary big" onClick={open} disabled={state.step === "waiting"}>
             <ArrowSquareOut size={18} weight="bold" aria-hidden="true" />
-            {state.step === "waiting" ? t("Warte auf Flowplan …", "Waiting for Flowplan …") : t("In Flowplan öffnen", "Open in Flowplan")}
+            {openLabel(target ? hostOf(target) : "Flowplan")}
           </button>
           <p className="instance-line">
-            {t("Instanz:", "Instance:")} <strong>{host}</strong>{" "}
-            <button
-              type="button"
-              className="link"
-              onClick={() => {
-                setDraft(instance);
-                setEditing(true);
-              }}
-            >
-              {t("ändern", "change")}
-            </button>
+            {mode === "saved" ? (
+              <button type="button" className="link" onClick={() => setEditing(true)}>
+                {t("Instanz ändern", "Change instance")}
+              </button>
+            ) : (
+              <button type="button" className="link" onClick={() => setEditing(true)}>
+                {t("Eigene Instanz verwenden …", "Use your own instance …")}
+              </button>
+            )}
           </p>
-          {instanceCheck?.ok && instanceCheck.warning && (
+          {targetCheck?.ok && targetCheck.warning && (
             <p className="field-warning">
               <Warning size={14} aria-hidden="true" /> {t("Unverschlüsselte Verbindung (http).", "Unencrypted connection (http).")}
             </p>

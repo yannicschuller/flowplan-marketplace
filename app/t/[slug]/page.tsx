@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { pageT } from "@/lib/page";
+import { config } from "@/lib/config";
 import { parseJsonColumn, publicTemplate, publishedVersions, type PreviewInfo } from "@/lib/store";
 import { LICENSE_URLS, categoryLabel, kindLabel, languageLabel, licenseLabel, type License } from "@/lib/catalog";
 import { formatBytes, formatDate, localized } from "@/lib/i18n";
@@ -79,6 +80,7 @@ export default async function TemplatePage({ params }: Props) {
               author: row.author_name,
               license: row.license,
             }}
+            defaultInstance={config.defaultInstance()}
           />
           <a className="button" href={`/api/templates/${row.slug}/download`} download>
             <DownloadSimple size={16} aria-hidden="true" />

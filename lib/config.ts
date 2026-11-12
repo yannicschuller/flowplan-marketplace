@@ -24,6 +24,23 @@ function httpsUrl(name: string, fallback: string) {
   return url.href;
 }
 
+// The hosted Flowplan the "In Flowplan öffnen" box offers before the visitor
+// has saved an instance of their own.
+export const DEFAULT_INSTANCE = "https://app.flowplan.org";
+
+// MARKETPLACE_DEFAULT_INSTANCE: an https origin, or empty/"off" for none
+// (the box then asks for the address as before). Unset: DEFAULT_INSTANCE.
+function defaultInstance(): string | null {
+  const name = "MARKETPLACE_DEFAULT_INSTANCE";
+  if (process.env[name] === undefined) return DEFAULT_INSTANCE;
+  const value = text(name);
+  if (!value || value.toLowerCase() === "off") return null;
+  const href = httpsUrl(name, DEFAULT_INSTANCE);
+  const url = new URL(href);
+  if ((url.pathname !== "/" && url.pathname !== "") || url.search || url.hash) throw new Error(`${name} must be an origin without a path: ${value}`);
+  return url.origin;
+}
+
 export const config = {
   // Where the database, the packages and the previews live (one volume).
   dataDir: () => resolve(/*turbopackIgnore: true*/ text("MARKETPLACE_DATA_DIR") || "./data"),
@@ -59,6 +76,8 @@ export const config = {
   // Legal pages (validated https addresses).
   impressumUrl: () => httpsUrl("MARKETPLACE_IMPRESSUM_URL", DEFAULT_IMPRESSUM_URL),
   privacyUrl: () => httpsUrl("MARKETPLACE_PRIVACY_URL", DEFAULT_PRIVACY_URL),
+  // Preselected instance of the "In Flowplan öffnen" box (null = none).
+  defaultInstance,
 };
 
 // Is the marketplace served over https (cookies get "Secure")?
