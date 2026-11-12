@@ -14,6 +14,7 @@ import { readPackage, readPreview } from "./storage";
 import { IMAGE_MIME } from "./images";
 import { sendMail } from "./mail";
 import { deleteAccount, requireDeletableUser } from "./account";
+import { requireSecurityClearance, rescan, securityOf, securitySummaryOf } from "./security-store";
 import { addPreviews, adminEdit, orderPreviews, removePreview, replacePackage, type AdminEdit, type EditScope } from "./admin-edit";
 import type { Analysis, Finding } from "./package";
 import type { User } from "./auth";
@@ -105,6 +106,8 @@ function submissionSummary(v: VersionWithTemplate) {
     publishedAt: iso(v.published_at),
     publicUrl: v.published_version_id && !v.unpublished_at && !v.withdrawn_at ? `${config.publicUrl()}/t/${v.slug}` : null,
     packageUrl: `${adminBase()}/submissions/${v.id}/package`,
+    // The stored security scan (README, "Security scan"); null until it ran.
+    security: securitySummaryOf(v.id),
     // Edits made in flowplan-admin (README "Editing as admin").
     adminEdits: parseJsonColumn<AdminEdit[]>(v.admin_edits, []).map((e) => ({ ...e, at: iso(e.at) })),
     // Official templates: the fields an admin set that the next seed keeps.
@@ -203,6 +206,8 @@ export async function submissionDetail(id: string, actor: string) {
       diff: versionDiff(v, base),
       // Workflows: the viewer's summary and data (README, "Workflow viewer"); null for other kinds.
       workflow: v.kind === "workflow" ? await adminWorkflowViewer(v) : null,
+      // The full security scan: verdict, findings, scannedAt, scannerVersion, override.
+      security: await securityOf(v.id),
       authorHistory: {
         counts: byStatus,
         submissions: history.map((h) => ({ id: h.id, templateId: h.template_id, slug: h.slug, title: h.title, number: h.number, status: h.status, submittedAt: iso(h.submitted_at) })),
@@ -232,18 +237,20 @@ export function submissionPreview(id: string, n: number) {
 }
 
 const DECISIONS = { publish: "publish", request_changes: "request_changes", reject: "reject" } as const;
-export async function decide(id: string, body: { decision?: unknown; message?: unknown }, actor: string) {
+export async function decide(id: string, body: { decision?: unknown; message?: unknown; securityOverride?: unknown }, actor: string) {
   const decision = typeof body.decision === "string" && body.decision in DECISIONS ? (body.decision as keyof typeof DECISIONS) : null;
   if (!decision) throw new HttpError(400, "invalid_decision", "decision must be publish, request_changes or reject.");
   const message = typeof body.message === "string" ? body.message.trim().slice(0, 5000) : "";
   if (decision !== "publish" && !message) throw new HttpError(400, "message_required", "Please tell the author why.");
   const v = requireVersion(id);
   const to = transition(v.status, decision, "admin");
+  // A block verdict of the security scan: only with securityOverride (a reason).
+  const override = decision === "publish" ? await requireSecurityClearance(v.id, body.securityOverride, actor, audit) : null;
   const at = now();
   transaction(() => {
     run("UPDATE versions SET status=?,review_message=?,decided_at=?,updated_at=?,published_at=? WHERE id=?", to, message, at, at, decision === "publish" ? at : null, v.id);
     if (decision === "publish") run("UPDATE templates SET published_version_id=?,published_at=COALESCE(published_at,?),updated_at=? WHERE id=?", v.id, at, at, v.template_id);
-    audit(actor, `decision_${decision}`, v.id, { template: v.template_id, number: v.number, from: v.status, message });
+    audit(actor, `decision_${decision}`, v.id, { template: v.template_id, number: v.number, from: v.status, message, ...(override ? { securityOverride: override.reason } : {}) });
   });
   const author = authorOf(v.author_id);
   let notified = false;
@@ -471,6 +478,7 @@ export async function adminRoute(request: Request, path: string[]): Promise<Resp
   if (method === "GET" && a === "submissions" && b && c === "package" && !d) return submissionPackage(b);
   if (method === "GET" && a === "submissions" && b && c === "previews" && d) return submissionPreview(b, Number(d));
   if (method === "POST" && a === "submissions" && b && c === "decision") return json(await decide(b, await body(), actor));
+  if (method === "POST" && a === "submissions" && b && c === "rescan" && !d) return json({ security: await rescan(b, actor, audit) });
   if (method === "GET" && a === "templates" && !b) return json(listTemplates(url.searchParams.get("state")));
   if (method === "POST" && a === "templates" && b && c === "unpublish") return json(await unpublish(b, await body(), actor));
   if (method === "POST" && a === "templates" && b && c === "republish") return json(await republish(b, actor));

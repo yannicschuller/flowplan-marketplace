@@ -28,6 +28,7 @@ import { insertVersion, nextVersionNumber, parseJsonColumn, parseSubmissionForm,
 import { readPackage, savePackage, savePreviews } from "./storage";
 import { sniffImage } from "./images";
 import { PENDING } from "./status";
+import { recordReplacement, scanReplacement } from "./security-store";
 import { config } from "./config";
 import { fieldLabels } from "./edit-labels";
 import type { User } from "./auth";
@@ -391,11 +392,20 @@ export async function replacePackage(scope: EditScope, id: string, request: Requ
   const changelogField = form.get("changelog");
   const changelog = typeof changelogField === "string" ? changelogField.trim().slice(0, LIMITS.changelog) : "";
   rateLimit();
-  const inspection = await inspectPackage(new Uint8Array(await file.arrayBuffer()));
+  const uploaded = new Uint8Array(await file.arrayBuffer());
+  const inspection = await inspectPackage(uploaded);
   const kindMatches = inspection.manifest?.kind === t.template.kind;
-  if (dryRun) return { dryRun: true, ...inspectionAnswer(inspection), kindMatches, scope: t.scope, official: !!t.author.system };
+  // The security scan, as for a submission (lib/security-store.ts). On a
+  // published template the new package is published at once: a block verdict
+  // needs securityOverride (checked only when it would really be stored).
+  const overrideField = form.get("securityOverride");
+  if (dryRun) {
+    const scan = await scanReplacement(uploaded, false, null);
+    return { dryRun: true, ...inspectionAnswer(inspection), kindMatches, scope: t.scope, official: !!t.author.system, security: scan.report };
+  }
   if (!inspection.ok) throw new HttpError(422, "package_invalid", "The package did not pass the checks.", { findings: inspection.findings });
   if (!kindMatches) throw new HttpError(409, "kind_mismatch", `The package is a ${inspection.manifest!.kind}, the template a ${t.template.kind}.`);
+  const scan = await scanReplacement(uploaded, t.scope !== "submission", typeof overrideField === "string" ? overrideField : null);
   const current = await storedInspection(t.version).catch(() => null);
   const previews = inspection.previews.length ? inspection.previews : (current?.previews ?? []);
   const at = now();
@@ -406,7 +416,8 @@ export async function replacePackage(scope: EditScope, id: string, request: Requ
     const { bytes, check } = await rebuild(t, inspection, meta, t.template.slug, t.version.number, previews);
     saveInPlace(t, meta, check, bytes, edit);
     audit(actor, "admin_package_replaced", t.version.id, { ...auditBase(t), sha256: check.sha256, size: bytes.length, uploaded: inspection.sha256 }, at);
-    return answer(t, { changed: ["package"], newVersion: false });
+    const security = await recordReplacement(t.version.id, null, actor, audit);
+    return { ...answer(t, { changed: ["package"], newVersion: false }), security };
   }
 
   if (t.template.unpublished_at) throw new HttpError(409, "not_listed", "Republish the template first; a new version of an unpublished template is not published.");
@@ -423,5 +434,6 @@ export async function replacePackage(scope: EditScope, id: string, request: Requ
     run("UPDATE templates SET published_version_id=?,updated_at=? WHERE id=?", version.id, at, t.template.id);
     audit(actor, "admin_package_replaced", version.id, { ...auditBase(t), number: version.number, previous: t.version.number, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length, uploaded: inspection.sha256 }, at);
   });
-  return answer(t, { versionId: version.id, changed: ["package"], newVersion: true, previous: t.version.number });
+  const security = await recordReplacement(version.id, scan.override, actor, audit);
+  return { ...answer(t, { versionId: version.id, changed: ["package"], newVersion: true, previous: t.version.number }), security };
 }

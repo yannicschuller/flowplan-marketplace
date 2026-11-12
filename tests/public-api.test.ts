@@ -22,7 +22,7 @@ before(async () => {
   for (const [i, bytes] of packages.entries()) {
     const s = await submitVia(a, bytes, { title: `Vorlage ${i}`, language: langs[i], category: i % 2 ? "meetings" : "projects", tags: i === 2 ? ["automation"] : ["x"] });
     assert.equal(s.status, 201, JSON.stringify(s.data));
-    if (i < 5) await decide(s.data.versionId, { decision: "publish" }, "test");
+    if (i < 5) await decide(s.data.versionId, { decision: "publish", securityOverride: "Test fixture: the workflow carries a fake bearer header." }, "test");
     slugs[i] = s.data.slug;
   }
 });
