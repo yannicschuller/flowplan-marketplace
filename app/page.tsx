@@ -7,7 +7,7 @@ import { KindIcon } from "@/components/kind-icon";
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr/MagnifyingGlass";
 import { SealCheck } from "@phosphor-icons/react/dist/ssr/SealCheck";
 
-type Search = { q?: string; kind?: string; category?: string; sort?: string; lang?: string; official?: string };
+type Search = { q?: string; kind?: string; category?: string; sort?: string; lang?: string; official?: string; account?: string };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const { t, locale } = await pageT();
@@ -37,6 +37,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
 
   return (
     <>
+      {sp.account === "deleted" && (
+        <p className="notice success" role="status">
+          {t("Dein Konto und deine Vorlagen sind gelöscht.", "Your account and your templates have been deleted.")}
+        </p>
+      )}
       <section className="hero">
         <p className="eyebrow">Flowplan Marketplace</p>
         <h1>{t("Vorlagen, die andere schon ausprobiert haben.", "Templates others have already tried out.")}</h1>

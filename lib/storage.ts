@@ -34,3 +34,9 @@ export function savePreviews(versionId: string, previews: { n: number; type: Ima
 }
 export const readPreview = (versionId: string, n: number, type: ImageType) =>
   readFileSync(dir("previews", checkId(versionId), `${Math.trunc(n)}.${ext(type)}`));
+
+// Both files of a version (package and previews); missing ones are fine.
+export function removeVersionFiles(versionId: string) {
+  rmSync(dir("packages", `${checkId(versionId)}.flowplan-template`), { force: true });
+  rmSync(dir("previews", checkId(versionId)), { recursive: true, force: true });
+}

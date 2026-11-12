@@ -12,6 +12,7 @@ import { findingsOf, parseJsonColumn, type PreviewInfo, type TemplateRow, type V
 import { readPackage, readPreview } from "./storage";
 import { IMAGE_MIME } from "./images";
 import { sendMail } from "./mail";
+import { deleteAccount, requireDeletableUser } from "./account";
 import type { Analysis, Finding } from "./package";
 import type { User } from "./auth";
 
@@ -283,7 +284,21 @@ export function listTemplates(state: string | null) {
   };
 }
 
-export function unpublish(id: string, body: { reason?: unknown }, actor: string) {
+// E-mail to the author of a template, if an address is known (GitHub-only
+// accounts see the same on /me). false when nothing was sent.
+async function mailAuthor(authorId: string, subject: [string, string], body: [string[], string[]]) {
+  const author = authorOf(authorId);
+  if (!author.email || author.official) return false;
+  return sendMail({
+    to: author.email,
+    subject: `${subject[0]} / ${subject[1]}`,
+    text: [`Hallo ${author.name},`, "", ...body[0], "", "—", "", `Hi ${author.name},`, "", ...body[1]].join("\n"),
+  });
+}
+
+// Terms §5: the author learns by e-mail why a published template was taken
+// down (and /me shows the reason).
+export async function unpublish(id: string, body: { reason?: unknown }, actor: string) {
   const t = requireTemplate(id);
   const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 2000) : "";
   if (!reason) throw new HttpError(400, "reason_required", "Please give a reason.");
@@ -296,9 +311,18 @@ export function unpublish(id: string, body: { reason?: unknown }, actor: string)
     run("UPDATE versions SET status=?,updated_at=? WHERE id=?", to, at, v.id);
     audit(actor, "unpublish", t.id, { slug: t.slug, reason });
   });
-  return { ok: true, state: "unpublished" };
+  const me = `${config.publicUrl()}/me`;
+  const notified = await mailAuthor(
+    t.author_id,
+    [`„${v.title}“ ist nicht mehr im Marketplace`, `"${v.title}" is no longer in the marketplace`],
+    [
+      [`wir haben deine Vorlage „${v.title}“ aus dem Flowplan Marketplace genommen. Der Grund:`, "", reason, "", `Du findest den Grund auch unter „Meine Einreichungen“: ${me}`, "Wenn du Fragen hast oder die Vorlage überarbeitet hast, antworte einfach auf diese E-Mail."],
+      [`we have taken your template "${v.title}" out of the Flowplan Marketplace. The reason:`, "", reason, "", `You'll also find the reason under "My submissions": ${me}`, "If you have questions or have revised the template, just reply to this e-mail."],
+    ],
+  );
+  return { ok: true, state: "unpublished", notified };
 }
-export function republish(id: string, actor: string) {
+export async function republish(id: string, actor: string) {
   const t = requireTemplate(id);
   if (templateState(t) !== "unpublished") throw new HttpError(409, "invalid_transition", "Only unpublished templates can be republished.");
   const v = one<VersionRow>("SELECT * FROM versions WHERE id=?", t.published_version_id!)!;
@@ -308,7 +332,25 @@ export function republish(id: string, actor: string) {
     run("UPDATE templates SET unpublished_at=NULL,unpublish_reason=NULL,updated_at=? WHERE id=?", at, t.id);
     audit(actor, "republish", t.id, { slug: t.slug });
   });
-  return { ok: true, state: "listed" };
+  const link = `${config.publicUrl()}/t/${t.slug}`;
+  const notified = await mailAuthor(
+    t.author_id,
+    [`„${v.title}“ ist wieder im Marketplace`, `"${v.title}" is back in the marketplace`],
+    [
+      [`deine Vorlage „${v.title}“ ist wieder im Flowplan Marketplace veröffentlicht.`, link],
+      [`your template "${v.title}" is published in the Flowplan Marketplace again.`, link],
+    ],
+  );
+  return { ok: true, state: "listed", notified };
+}
+
+// On request (e-mail to the maintainer): the same deletion as "Konto
+// löschen" on /me (lib/account.ts), with a reason in the audit log.
+export async function deleteUser(id: string, body: { reason?: unknown }, actor: string) {
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 2000) : "";
+  if (!reason) throw new HttpError(400, "reason_required", "Please give a reason.");
+  const user = requireDeletableUser(id);
+  return deleteAccount(user, { actor, reason, audit });
 }
 
 export function listReports(status: string | null) {
@@ -410,8 +452,9 @@ export async function adminRoute(request: Request, path: string[]): Promise<Resp
   if (method === "GET" && a === "submissions" && b && c === "previews" && d) return submissionPreview(b, Number(d));
   if (method === "POST" && a === "submissions" && b && c === "decision") return json(await decide(b, await body(), actor));
   if (method === "GET" && a === "templates" && !b) return json(listTemplates(url.searchParams.get("state")));
-  if (method === "POST" && a === "templates" && b && c === "unpublish") return json(unpublish(b, await body(), actor));
-  if (method === "POST" && a === "templates" && b && c === "republish") return json(republish(b, actor));
+  if (method === "POST" && a === "templates" && b && c === "unpublish") return json(await unpublish(b, await body(), actor));
+  if (method === "POST" && a === "templates" && b && c === "republish") return json(await republish(b, actor));
+  if (method === "POST" && a === "users" && b && c === "delete" && !d) return json(await deleteUser(b, await body(), actor));
   if (method === "GET" && a === "reports" && !b) return json(listReports(url.searchParams.get("status")));
   if (method === "POST" && a === "reports" && b && c === "resolve") return json(resolveReport(b, await body(), actor));
   if (method === "GET" && a === "stats") return json(stats());

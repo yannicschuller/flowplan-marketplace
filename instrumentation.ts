@@ -1,6 +1,7 @@
 // On every server start: demo data in demo mode (npm run demo), then the
-// official templates from seed/official/ (lib/official.ts). A failure here
-// is logged and never keeps the marketplace from starting.
+// official templates from seed/official/ (lib/official.ts), then the hourly
+// retention cleanup (lib/cleanup.ts). A failure here is logged and never
+// keeps the marketplace from starting.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.MARKETPLACE_DEMO === "1") {
@@ -13,5 +14,11 @@ export async function register() {
     if (outcomes.length) console.info(seedSummary(outcomes));
   } catch (error) {
     console.error("Official templates could not be seeded:", error);
+  }
+  try {
+    const { startCleanupTimer } = await import("./lib/cleanup");
+    startCleanupTimer();
+  } catch (error) {
+    console.error("Cleanup could not be started:", error);
   }
 }

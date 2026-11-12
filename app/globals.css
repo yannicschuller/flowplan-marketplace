@@ -1184,8 +1184,54 @@ textarea {
   background: var(--surface);
   border-radius: 0 8px 8px 0;
 }
+.review-message.decision.rejected,
+.review-message.decision.unpublished {
+  border-left-color: var(--err);
+}
+.review-message.decision.published {
+  border-left-color: var(--ok);
+}
 .profile input {
   max-width: 320px;
+}
+.danger-zone {
+  border: 1px solid color-mix(in srgb, var(--err) 35%, var(--border));
+  border-radius: 14px;
+  background: var(--card);
+  padding: 16px 20px;
+}
+.danger-zone h2 {
+  margin-top: 0;
+  font-size: 18px;
+  color: var(--err);
+}
+.danger-zone > p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--secondary);
+}
+.delete-confirm {
+  display: grid;
+  gap: 12px;
+}
+.delete-confirm .notice {
+  margin: 0;
+}
+.delete-confirm .muted {
+  margin: 0;
+  font-size: 13px;
+}
+.delete-confirm input {
+  max-width: 320px;
+}
+.button.danger-solid {
+  background: var(--err);
+  border-color: var(--err);
+  color: var(--bg);
+}
+.button.danger-solid:hover {
+  background: color-mix(in srgb, var(--err) 85%, var(--text));
+  border-color: transparent;
 }
 .legal {
   padding-top: 20px;

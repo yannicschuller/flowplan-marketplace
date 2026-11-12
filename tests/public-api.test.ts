@@ -83,7 +83,7 @@ test("detail, download with counting, previews, versions", async () => {
 
 test("unpublished templates disappear everywhere", async () => {
   const id = one<{ id: string }>("SELECT id FROM templates WHERE slug=?", slugs[1])!.id;
-  unpublish(id, { reason: "test" }, "test");
+  await unpublish(id, { reason: "test" }, "test");
   assert.ok(!(await list("")).data.templates.some((t: any) => t.slug === slugs[1]));
   assert.equal((await handle(() => downloadRoute(req("/x"), slugs[1]))).status, 404);
 });

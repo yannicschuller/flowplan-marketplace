@@ -177,7 +177,6 @@ export function consumeMagicLink(token: unknown, at = now()): { user: User; next
     if (link.expires_at < at) throw new MagicLinkError("expired");
     const changed = run("UPDATE magic_links SET used_at=? WHERE token_hash=? AND used_at IS NULL", at, hash).changes;
     if (Number(changed) !== 1) throw new MagicLinkError("used");
-    run("DELETE FROM magic_links WHERE expires_at < ?", at - 86_400_000);
     const user = one<User>("SELECT * FROM users WHERE email=?", link.email) ?? createUser({ name: link.email.split("@")[0], email: link.email });
     if (user.blocked_at) throw new HttpError(403, "blocked", "This account is blocked.");
     return { user, next: link.next };

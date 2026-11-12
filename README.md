@@ -9,7 +9,7 @@
 A Next.js 16 app (App Router, TypeScript strict) with one SQLite database (`node:sqlite`) and its files in one data directory.
 
 - **Browse** (`/`, `/t/<slug>`, `/u/<author>`): featured, newest, popular, categories, search; template pages with previews, description (German or English by the visitor's language), author, licence, version history, download counts, *In Flowplan öffnen*, *Herunterladen*, *Melden*.
-- **Submit** (`/submit`, `/me`): upload a `.flowplan-template` file or receive it from a Flowplan instance; automatic checks; licence (CC BY 4.0 by default, CC0, MIT) and rights confirmation; status per version, edit, new version, withdraw.
+- **Submit** (`/submit`, `/me`): upload a `.flowplan-template` file or receive it from a Flowplan instance; automatic checks; licence (CC BY 4.0 by default, CC0, MIT) and rights confirmation; status per version with the review team's message (changes requested, rejected, unpublished with reason – the only channel for GitHub-only accounts), edit, new version, withdraw; *Konto löschen* / *Delete account* (see [Accounts and retention](#accounts-and-retention)).
 - **Review** happens in flowplan-admin through the [admin API](#admin-api).
 - Languages: German and English (browser language; switch in the footer).
 - Privacy: no trackers, no visitor cookies (only the language choice when a visitor picks one), IP addresses only as a daily HMAC for rate limits, only anonymous download/open counters.
@@ -89,13 +89,20 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `GET /api/admin/submissions/:id/previews/:n` | a preview image |
 | `POST /api/admin/submissions/:id/decision` | `{decision: "publish"\|"request_changes"\|"reject", message}` – e-mails the author |
 | `GET /api/admin/templates?state=listed\|unpublished\|withdrawn\|all` | templates with a published version |
-| `POST /api/admin/templates/:id/unpublish` `{reason}` · `POST …/republish` | id or slug |
+| `POST /api/admin/templates/:id/unpublish` `{reason}` · `POST …/republish` | id or slug; e-mails the author (the reason on unpublish, a short note on republish) if an address is known – `notified` in the answer |
+| `POST /api/admin/users/:id/delete` `{reason}` | id or handle; deletes the account like *Konto löschen* (below) on the author's request, `reason` required, audited as `account_deleted`; answers `{deleted, notified, templates, published, versions, reports}`. The built-in author Flowplan: `403 system_account` |
 | `GET /api/admin/reports?status=open\|resolved\|all` · `POST /api/admin/reports/:id/resolve` `{resolution}` | reports |
 | `GET /api/admin/stats` | counts per status, templates, downloads, opens, open reports |
 | `GET /api/admin/featured` · `POST /api/admin/featured` `{templates: [id or slug, …]}` | featured (≤ 12, in order) |
 | `GET /api/admin/audit?limit=` | the audit log |
 
 Official templates (see [Official templates](#official-templates)) carry `official: true` in `GET /api/admin/templates` and in submissions, and their `author` has `official: true` (everybody else: `false`). They can be unpublished, republished and featured like any other template; an unpublished one is not published again by the next start.
+
+## Accounts and retention
+
+**Deleting an account** – by the author on `/me` (*Konto löschen*: a plain form POST to `/api/me/delete` with the session's CSRF token and the handle typed again; the session is checked again) or by the maintainer through `POST /api/admin/users/:id/delete`. It removes, in one transaction: the user row (name, e-mail address, GitHub link), sessions, sign-in links, the account's rate-limit keys, every template of the account with all versions (published ones disappear at once), their download/open counters and the reports about them (deleted with the template – nothing left to act on). After the commit the package and preview files of every version are deleted from the data volume. The audit log keeps its entries, but in entries about the account, its templates and versions the author's name, handle and address are replaced by `gelöschtes Konto` (the address in every entry); the deletion itself is logged as `account_deleted` with counts only. If the account has an e-mail address, a confirmation goes there right after the deletion; the address is not kept anywhere. The built-in author Flowplan can't be deleted. Code: `lib/account.ts`.
+
+**Retention** (`lib/cleanup.ts`, hourly – a timer started in `instrumentation.ts`, and also when a rate-limit window starts): expired sessions; sign-in links a day after they ran out (until then a late click says "expired"); rate-limit windows older than two days. Everything else stays until the author withdraws or deletes it.
 
 ## Environment
 
@@ -107,7 +114,7 @@ Official templates (see [Official templates](#official-templates)) carry `offici
 | `MARKETPLACE_ADMIN_TOKEN` | admin API token, the same value as in flowplan-admin; unset = admin API off |
 | `MARKETPLACE_ADMIN_TOKEN_LABEL` | name of the token in the audit log (default `flowplan-admin`) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in; unset = hidden |
-| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` (`true` for 465) | e-mail sign-in links and review notifications; unset = e-mail sign-in hidden |
+| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` (`true` for 465) | e-mail sign-in links and notifications (decisions, unpublish, account deletion); unset = e-mail sign-in hidden |
 | `MARKETPLACE_SECRET` | optional key for CSRF tokens and IP hashes; default: generated once as `secret.key` in the data directory |
 | `MARKETPLACE_IMPRESSUM_URL` | Impressum (https, default `https://flowplan.org/impressum`); the footer links there and `/impressum` redirects there (308). For the default address visitors land on `/de/impressum` or `/en/impressum` of the website in their language; other addresses are used as given |
 | `MARKETPLACE_PRIVACY_URL` | privacy policy (https, default `https://flowplan.org/datenschutz`), the same way via `/datenschutz` |
@@ -154,7 +161,7 @@ Then *Generate a new client secret* and set `GITHUB_CLIENT_ID` and `GITHUB_CLIEN
 
 ### SMTP
 
-Any SMTP account that may send as `SMTP_FROM` (e.g. `marketplace@flowplan.org`; SPF/DKIM for the domain). Port 587 with STARTTLS, or 465 with `SMTP_SECURE=true`. Used for sign-in links (valid 15 minutes, once; the link opens a confirm page so mail scanners don't use it up) and review decisions.
+Any SMTP account that may send as `SMTP_FROM` (e.g. `marketplace@flowplan.org`; SPF/DKIM for the domain). Port 587 with STARTTLS, or 465 with `SMTP_SECURE=true`. Used for sign-in links (valid 15 minutes, once; the link opens a confirm page so mail scanners don't use it up), review decisions, unpublish/republish notes and the account deletion confirmation. GitHub-only accounts get none of these; `/me` shows every decision with its message.
 
 ### Admin token (flowplan-admin)
 

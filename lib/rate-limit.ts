@@ -3,6 +3,7 @@
 // address that changes every day.
 import { hmac } from "./secret";
 import { one, run } from "./db";
+import { cleanupSometimes } from "./cleanup";
 
 export class RateLimitError extends Error {
   constructor(public retryAfter: number) {
@@ -16,7 +17,7 @@ export function hit(key: string, max: number, windowSeconds: number, at = Date.n
   const row = one<{ window_start: number; count: number }>("SELECT window_start,count FROM rate_limits WHERE key=?", key);
   if (!row || at - row.window_start >= windowMs) {
     run("INSERT INTO rate_limits(key,window_start,count) VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET window_start=excluded.window_start,count=1", key, at);
-    pruneSometimes(at);
+    cleanupSometimes(at);
     return;
   }
   if (row.count >= max) throw new RateLimitError(Math.ceil((row.window_start + windowMs - at) / 1000));
@@ -32,14 +33,6 @@ export function allow(key: string, max: number, windowSeconds: number, at = Date
     if (error instanceof RateLimitError) return false;
     throw error;
   }
-}
-
-let lastPrune = 0;
-function pruneSometimes(at: number) {
-  if (at - lastPrune < 60 * 60 * 1000) return;
-  lastPrune = at;
-  // Windows are at most a day long.
-  run("DELETE FROM rate_limits WHERE window_start < ?", at - 2 * 24 * 60 * 60 * 1000);
 }
 
 // The visitor's address as a daily HMAC: enough to tell repeated requests
