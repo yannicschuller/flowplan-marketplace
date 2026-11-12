@@ -2,6 +2,7 @@
 // MARKETPLACE_ADMIN_TOKEN, JSON in and out, every change in the audit log
 // (who = the token's label, plus the person flowplan-admin names in the
 // optional X-Admin-User header).
+import { adminWorkflowViewer } from "./workflow-viewer";
 import { all, now, one, run, transaction } from "./db";
 import { config } from "./config";
 import { HttpError, clientIp, json, readJson } from "./http";
@@ -164,7 +165,7 @@ export function listSubmissions(statusParam: string | null) {
   return { submissions: rows.map(submissionSummary) };
 }
 
-export function submissionDetail(id: string, actor: string) {
+export async function submissionDetail(id: string, actor: string) {
   let v = requireVersion(id);
   // Opening a fresh submission starts its review.
   if (v.status === "submitted") {
@@ -193,6 +194,8 @@ export function submissionDetail(id: string, actor: string) {
         url: `${adminBase()}/submissions/${v.id}/previews/${p.n}`,
       })),
       diff: versionDiff(v, base),
+      // Workflows: the viewer's summary and data (README, "Workflow viewer"); null for other kinds.
+      workflow: v.kind === "workflow" ? await adminWorkflowViewer(v) : null,
       authorHistory: {
         counts: byStatus,
         submissions: history.map((h) => ({ id: h.id, templateId: h.template_id, slug: h.slug, title: h.title, number: h.number, status: h.status, submittedAt: iso(h.submitted_at) })),
@@ -447,7 +450,7 @@ export async function adminRoute(request: Request, path: string[]): Promise<Resp
   const [a, b, c, d] = path;
   const body = async () => (method === "POST" ? await readJson(request) : {});
   if (method === "GET" && a === "submissions" && !b) return json(listSubmissions(url.searchParams.get("status")));
-  if (method === "GET" && a === "submissions" && b && !c) return json(submissionDetail(b, actor));
+  if (method === "GET" && a === "submissions" && b && !c) return json(await submissionDetail(b, actor));
   if (method === "GET" && a === "submissions" && b && c === "package" && !d) return submissionPackage(b);
   if (method === "GET" && a === "submissions" && b && c === "previews" && d) return submissionPreview(b, Number(d));
   if (method === "POST" && a === "submissions" && b && c === "decision") return json(await decide(b, await body(), actor));

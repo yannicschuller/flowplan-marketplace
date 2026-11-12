@@ -8,6 +8,8 @@ import { IMAGE_MIME } from "./images";
 import { createReport } from "./reports";
 import { hit, ipKey } from "./rate-limit";
 import { inspectPackage, LIMITS } from "./package";
+import { viewerFromEntries } from "./workflow-viewer";
+import { LOCALE_COOKIE, pickLocale } from "./i18n";
 import {
   GITHUB_STATE_COOKIE,
   consumeMagicLink,
@@ -125,11 +127,17 @@ export async function inspectRoute(request: Request) {
   hit(`inspect:${ipKey(clientIp(request))}`, 60, 3600);
   const bytes = await readBody(request, LIMITS.packageBytes + 1024);
   const inspection = await inspectPackage(bytes);
+  // A workflow's diagram and summary in the visitor's language (the submit preview).
+  const viewer =
+    inspection.manifest?.kind === "workflow" && inspection.analysis.workflow
+      ? viewerFromEntries(inspection.payloadEntries, inspection.manifest.payload, pickLocale(cookie(request, LOCALE_COOKIE), request.headers.get("accept-language")))
+      : null;
   return json({
     ok: inspection.ok,
     manifest: inspection.manifest,
     findings: inspection.findings,
     analysis: inspection.analysis,
+    viewer,
     size: inspection.size,
     previews: inspection.previews.map((p) => ({ n: p.n, type: IMAGE_MIME[p.type], data: p.bytes.toString("base64") })),
   });

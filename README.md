@@ -23,6 +23,7 @@ template.json            format, kind, title, summary{de,en}, description{de,en}
                          tags[≤10], minVersion, language, payload
 payload/…                the kind's own exchange format, unchanged
                          document/database: flowplan-template-1 ZIP · workflow: flowplan.workflow JSON
+                         (+ optional payload/workflow-meta.json for the viewer, see below)
                          whiteboard, appearance (+ fonts), link-rules: JSON
 preview/1.webp … 4       optional, ≤ 1 MB each, WebP/PNG/JPEG
 ```
@@ -32,6 +33,22 @@ Limits: 25 MB per package, 64 KB for `template.json`. Downloads carry `template.
 ### Automatic checks
 
 Every package is checked on upload and the findings (error / warning / info) are stored for the author and the review: envelope schema and sizes; ZIP guards (entry count, per-entry and total size, compression ratio, real inflated size, no `..`, absolute paths, backslashes, symlinks, encrypted or duplicate entries – also for the nested template ZIP); previews identified by their bytes; kind sanity (document/database: `flowplan-template-1` with matching kind and SHA-256 of every attachment; workflow: graph present, node types, external hosts of HTTP steps, AI and e-mail steps, webhook triggers, strings that look like credentials; link rules: patterns compile, targets are http(s); appearance: accent colour, font files are fonts). Descriptions are Markdown without HTML: HTML is removed and links are limited to http(s)/mailto.
+
+### Workflow viewer
+
+Workflow templates get a read-only viewer on their page and in the submit preview: the diagram at the graph's own node positions (server-rendered SVG, pan by dragging or the arrow keys, zoom with the buttons, Ctrl/⌘ + wheel, pinch or + and −, *Einpassen* fits everything), a node's settings in a side panel (a bottom sheet on phones) after a click or Enter, risk markings with colour, symbol and word (HTTP steps with their host as text, AI and e-mail steps; derived from the node types – the meta can only add a marking), a legend, *Was er macht* – a summary generated from the graph (trigger, then the steps in order with their branches) in the visitor's language – and *Nach dem Import legst du fest* with the workflow's gaps.
+
+Flowplan adds `payload/workflow-meta.json` to every workflow package it builds (the workflow itself is unchanged):
+
+```
+{ "format": "flowplan.workflow-meta", "version": 1,
+  "nodes": { "<node type>": { "name": {de, en}, "description": {de, en}, "group": "trigger|logic|records|pages|notify|ai|http",
+                              "icon": "<SVG path data, viewBox 0 0 256 256, filled>", "ports": {"<port>": {de, en}}?,
+                              "external": true?, "ai": true?, "email": true? } },
+  "gaps": [ { "id", "label": {de, en}, "kind", "optional": true? } ] }
+```
+
+`nodes` holds exactly the node types the graph uses. A gap is a gallery workflow's `$ask:<id>` token or the id of a reference (database, page, person …) of a published workflow. Everything is checked like the rest of the package (`lib/workflow-meta.ts`): texts are length-limited, unknown fields are dropped, an `icon` that is not plain path data is dropped (finding `workflow-meta-icon`), a broken file gives the finding `workflow-meta-invalid`. Without the file (older packages) the viewer shows the raw node types with a generic symbol. Nothing from a package is rendered as HTML, nothing is fetched or linked, large graphs are cut at 100 nodes with a note, settings at 40 rows per node. Code: `lib/workflow-view.ts` (model and summary), `lib/workflow-svg.ts` (SVG), `lib/workflow-viewer.ts` (from a package), `components/workflow-viewer.tsx`.
 
 ### Statuses
 
@@ -84,7 +101,7 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | | |
 |---|---|
 | `GET /api/admin/submissions?status=a,b\|all` | queue (default: submitted, in_review, changes_requested) with findings, author, sizes |
-| `GET /api/admin/submissions/:id` | detail: template.json, findings, previews (URLs), diff to the published version, author's history; starts the review |
+| `GET /api/admin/submissions/:id` | detail: template.json, findings, previews (URLs), diff to the published version, author's history, for workflows `workflow` (below); starts the review |
 | `GET /api/admin/submissions/:id/package` | the package |
 | `GET /api/admin/submissions/:id/previews/:n` | a preview image |
 | `POST /api/admin/submissions/:id/decision` | `{decision: "publish"\|"request_changes"\|"reject", message}` – e-mails the author |
@@ -95,6 +112,8 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `GET /api/admin/stats` | counts per status, templates, downloads, opens, open reports |
 | `GET /api/admin/featured` · `POST /api/admin/featured` `{templates: [id or slug, …]}` | featured (≤ 12, in order) |
 | `GET /api/admin/audit?limit=` | the audit log |
+
+For a workflow submission the detail has `workflow: {summary: {de, en}, viewer: {de, en}}` (`null` for other kinds): `summary` is *Was er macht* as plain text (one line for the trigger, then `1. …` per step); `viewer.<lang>` is what the template page shows – `svg` (the diagram as markup: only `svg, defs, marker, g, rect, path, text, title`, every text escaped, no styles, scripts or links; it is styled by the class names `wf-…`, see `app/globals.css`), `bounds {x, y, w, h}`, `nodes` (id, type, label, name, description, group, icon path, position, host, risks, ports, `settings` – read-only rows, see `SettingValue` in `lib/workflow-view.ts` – and the step number), `edges`, `loops`, `summary {lead, steps, notes}`, `gaps` (labels), `shown`/`total` and `risks {ai, email, external, hosts}`.
 
 Official templates (see [Official templates](#official-templates)) carry `official: true` in `GET /api/admin/templates` and in submissions, and their `author` has `official: true` (everybody else: `false`). They can be unpublished, republished and featured like any other template; an unpublished one is not published again by the next start.
 
