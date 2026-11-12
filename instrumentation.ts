@@ -1,6 +1,7 @@
 // On every server start: demo data in demo mode (npm run demo), then the
-// official templates from seed/official/ (lib/official.ts), then the hourly
-// retention cleanup (lib/cleanup.ts). A failure here is logged and never
+// official templates from seed/official/ (lib/official.ts), the security
+// scan of outdated versions (in the background) and the hourly retention
+// cleanup (lib/cleanup.ts). A failure here is logged and never
 // keeps the marketplace from starting.
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -15,6 +16,11 @@ export async function register() {
   } catch (error) {
     console.error("Official templates could not be seeded:", error);
   }
+  // The security scan of pending and published versions made by an older
+  // scanner (lib/security-store.ts) – in the background, never delaying the start.
+  void import("./lib/security-store")
+    .then(({ rescanOutdated }) => rescanOutdated((message) => console.info(message)))
+    .catch((error) => console.error("Security scan on start failed:", error));
   try {
     const { startCleanupTimer } = await import("./lib/cleanup");
     startCleanupTimer();
