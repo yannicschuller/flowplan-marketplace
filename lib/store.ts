@@ -30,6 +30,8 @@ export type TemplateRow = {
   updated_at: number;
   official_key: string | null;
   official_sha256: string | null;
+  // Official templates: metadata an admin set (JSON, field → value; "previews": true) – lib/admin-edit.ts.
+  admin_overrides: string;
 };
 export type VersionRow = {
   id: string;
@@ -59,6 +61,8 @@ export type VersionRow = {
   updated_at: number;
   decided_at: number | null;
   published_at: number | null;
+  // Edits made in flowplan-admin (JSON list of AdminEdit, lib/admin-edit.ts).
+  admin_edits: string;
 };
 export type PreviewInfo = { n: number; type: ImageType };
 
@@ -95,13 +99,24 @@ export function parseSubmissionForm(input: unknown): SubmissionForm {
   return parsed.data;
 }
 
+// A slug is taken by a template's current address or by an old address that
+// still redirects (to another template than `except`).
+export function slugInUse(slug: string, except = "") {
+  return !!(
+    one("SELECT 1 FROM templates WHERE slug=? AND id<>?", slug, except) || one("SELECT 1 FROM slug_redirects WHERE slug=? AND template_id<>?", slug, except)
+  );
+}
 export function uniqueSlug(title: string) {
   const root = slugify(title, 60);
   for (let i = 0; i < 1000; i++) {
     const slug = i ? `${root}-${i + 1}` : root;
-    if (!one("SELECT 1 FROM templates WHERE slug=?", slug)) return slug;
+    if (!slugInUse(slug)) return slug;
   }
   return `${root}-${newId().slice(0, 8)}`;
+}
+// The current slug of a template that was renamed (null: no such old address).
+export function movedSlug(slug: string): string | null {
+  return one<{ slug: string }>("SELECT t.slug FROM slug_redirects r JOIN templates t ON t.id=r.template_id WHERE r.slug=?", slug)?.slug ?? null;
 }
 
 const templateUrl = (slug: string) => `${config.publicUrl()}/t/${slug}`;
@@ -185,6 +200,7 @@ export async function submit(user: User, packageBytes: Uint8Array, formInput: un
         updated_at: at,
         official_key: null,
         official_sha256: null,
+        admin_overrides: "{}",
       };
       run("INSERT INTO templates(id,slug,author_id,kind,created_at,updated_at) VALUES(?,?,?,?,?,?)", template.id, template.slug, user.id, kind, at, at);
     }
@@ -413,8 +429,11 @@ export const parseJsonColumn = <T>(value: string, fallback: T): T => {
     return fallback;
   }
 };
+// `r` changes with the package (an admin may change the previews of a
+// version in place), so the long-cached images never go stale.
+const previewRev = (version: { sha256: string }) => version.sha256.slice(0, 12);
 const previewUrls = (slug: string, version: VersionRow) =>
-  parseJsonColumn<PreviewInfo[]>(version.previews, []).map((p) => `${config.publicUrl()}/api/templates/${slug}/previews/${p.n}?version=${version.number}`);
+  parseJsonColumn<PreviewInfo[]>(version.previews, []).map((p) => `${config.publicUrl()}/api/templates/${slug}/previews/${p.n}?version=${version.number}&r=${previewRev(version)}`);
 
 export function templateSummary(row: PublicRow) {
   const previews = previewUrls(row.slug, row);

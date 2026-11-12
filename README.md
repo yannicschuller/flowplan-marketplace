@@ -73,7 +73,7 @@ Per file – the file name without `.flowplan-template` is the template's stable
 - **fails the normal package checks**, or the kind changed → skipped with a warning in the log; the other files and the start go on;
 - **removed from the folder** → the template stays as it is (unpublish it in flowplan-admin).
 
-The metadata comes from `template.json`; two optional fields there: `license` (default `CC0-1.0`) and `changelog`. Every change is in the audit log with actor `seed` (`official_created`, `official_updated`; `official_skipped` and `official_invalid` once per file content). Demo mode (`npm run demo`) loads the folder too.
+Metadata an admin edited in flowplan-admin is kept across these updates ([Editing as admin](#editing-as-admin)). The metadata comes from `template.json`; two optional fields there: `license` (default `CC0-1.0`) and `changelog`. Every change is in the audit log with actor `seed` (`official_created`, `official_updated`; `official_skipped` and `official_invalid` once per file content). Demo mode (`npm run demo`) loads the folder too.
 
 ## Browser hand-overs
 
@@ -112,8 +112,26 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `GET /api/admin/stats` | counts per status, templates, downloads, opens, open reports |
 | `GET /api/admin/featured` · `POST /api/admin/featured` `{templates: [id or slug, …]}` | featured (≤ 12, in order) |
 | `GET /api/admin/audit?limit=` | the audit log |
+| `PATCH /api/admin/templates/:id` · `PATCH /api/admin/submissions/:id` | edit the metadata of a published template (id or slug; its published version) or of a submission in review (`submitted`, `in_review`, `changes_requested`) – see [Editing as admin](#editing-as-admin) |
+| `POST …/previews` (multipart, files in `preview`) · `DELETE …/previews/:n` · `POST …/previews/order` `{order: [n, …]}` | add, remove, reorder the previews (on `templates/:id` or `submissions/:id`) |
+| `POST …/package` (multipart `package`, optional `changelog`; `?dryRun=1` only checks) | replace the package (on `templates/:id` or `submissions/:id`) |
 
 For a workflow submission the detail has `workflow: {summary: {de, en}, viewer: {de, en}}` (`null` for other kinds): `summary` is *Was er macht* as plain text (one line for the trigger, then `1. …` per step); `viewer.<lang>` is what the template page shows – `svg` (the diagram as markup: only `svg, defs, marker, g, rect, path, text, title`, every text escaped, no styles, scripts or links; it is styled by the class names `wf-…`, see `app/globals.css`), `bounds {x, y, w, h}`, `nodes` (id, type, label, name, description, group, icon path, position, host, risks, ports, `settings` – read-only rows, see `SettingValue` in `lib/workflow-view.ts` – and the step number), `edges`, `loops`, `summary {lead, steps, notes}`, `gaps` (labels), `shown`/`total` and `risks {ai, email, external, hosts}`.
+
+### Editing as admin
+
+`lib/admin-edit.ts`. Two scopes, the same endpoints: **`templates/:id`** edits the template's published version (listed or unpublished; a withdrawn one answers `409 withdrawn`), **`submissions/:id`** a version waiting for review (other states: `409 not_in_review`).
+
+`PATCH` takes JSON with any of `title`, `summary: {de?, en?}`, `description: {de?, en?}` (Markdown, shown as before), `category`, `tags`, `language`, `minVersion`, `slug`, plus `notify` (boolean), `message` (to the author, ≤ 2000) and `also` (`["previews", "package"]`: changes made through the other endpoints, named in the same e-mail). Validation is the submit form's (`400 invalid_form` with `fields`); `license` is the author's choice (`400 license_readonly`), other keys `400 unknown_field`, nothing changed `400 no_changes`. The answer: `{ok, scope, templateId, versionId, slug, number, status, sha256, size, findings, official, adminOverrides, changed, notified}`.
+
+- **In place, no new version.** Metadata and previews change the version itself: its number and status stay, the package is rebuilt – the payload entries are copied unchanged, `template.json` and `preview/*` are new – and checked again like a submission (`422 package_invalid` with `findings` if not); SHA-256, size and findings are recomputed (`X-Template-Sha256` of the download matches). This is simpler and more robust than a new version for what is only metadata: no second review, no pending-version conflicts, the version history and download counts stay as they are. Preview URLs carry `&r=<hash>` so cached images are replaced.
+- **Recorded on the version** as `adminEdits` (`{at, by, fields, message, notify, notified}`, in the submission detail) and in the audit log: `admin_edit` with `fields` and `changes` (before/after for every field, only the lengths for descriptions), `admin_previews_added`, `admin_previews_reordered`, `admin_preview_removed`, `admin_package_replaced` – actor as everywhere (token label + `X-Admin-User`).
+- **Slug:** `a-z`, `0-9`, `-`, at most 60 characters, unique (`409 slug_taken`, also for an old address that still redirects to another template). The old address keeps working: `/t/<old>` and `/api/templates/<old>[/download|/previews/:n]` answer `308` to the new one (table `slug_redirects`; renaming back removes it; account deletion removes them). Only the edited version's `template.json` gets the new slug and URL; `marketplace.id` is the stable key.
+- **Previews:** at most 4, each at most 1 MB, WebP, PNG or JPEG by their bytes (`413 preview_too_large`, `415 preview_type`, `409 preview_limit`); stored by their real type and numbered 1… in order.
+- **Package:** the normal checks (`422 package_invalid` with `findings`, `409 kind_mismatch`); `?dryRun=1` (or a form field `dryRun=1`) returns `{dryRun, ok, kind, kindMatches, findings, analysis, size, sha256, previews}` and stores nothing. The new package's payload replaces the old one, its previews too if it brings any (else the current ones stay); the metadata stays as stored. On a submission the version is replaced in place; on a published template it becomes a **new published version** at once, marked as by admin (`adminEdits` `["package"]`, `changelog` from the form or "Paket vom Prüfteam ersetzt"), refused while another version waits (`409 pending_version` – edit that submission) or while the template is unpublished (`409 not_listed`).
+- **Author notification:** `notify` defaults to `true` for `templates/:id` and `false` for `submissions/:id` (a decision e-mail follows). The e-mail: *Ein Admin hat deine Vorlage „…“ angepasst: <Felder>* with the message. Accounts without an address (GitHub only) see the same on `/me` under the version; so does everybody. The preview and package endpoints never e-mail – name them in `also` of the closing `PATCH`. The built-in author Flowplan gets nothing.
+- **Official templates** can be edited too. The changed metadata fields (and `previews`) are kept in `templates.admin_overrides` (`adminOverrides` in the answers and in `GET /api/admin/templates`): a changed seed file still brings a new version with its payload, but with the admin's values for those fields and the current previews; fields the admin didn't touch follow the file. A replaced package lasts until the seed file changes.
+- Rate limit: 300 edits per hour.
 
 Official templates (see [Official templates](#official-templates)) carry `official: true` in `GET /api/admin/templates` and in submissions, and their `author` has `official: true` (everybody else: `false`). They can be unpublished, republished and featured like any other template; an unpublished one is not published again by the next start.
 
@@ -133,7 +151,7 @@ Official templates (see [Official templates](#official-templates)) carry `offici
 | `MARKETPLACE_ADMIN_TOKEN` | admin API token, the same value as in flowplan-admin; unset = admin API off |
 | `MARKETPLACE_ADMIN_TOKEN_LABEL` | name of the token in the audit log (default `flowplan-admin`) |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub sign-in; unset = hidden |
-| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` (`true` for 465) | e-mail sign-in links and notifications (decisions, unpublish, account deletion); unset = e-mail sign-in hidden |
+| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SECURE` (`true` for 465) | e-mail sign-in links and notifications (decisions, unpublish, admin edits, account deletion); unset = e-mail sign-in hidden |
 | `MARKETPLACE_SECRET` | optional key for CSRF tokens and IP hashes; default: generated once as `secret.key` in the data directory |
 | `MARKETPLACE_IMPRESSUM_URL` | Impressum (https, default `https://flowplan.org/impressum`); the footer links there and `/impressum` redirects there (308). For the default address visitors land on `/de/impressum` or `/en/impressum` of the website in their language; other addresses are used as given |
 | `MARKETPLACE_PRIVACY_URL` | privacy policy (https, default `https://flowplan.org/datenschutz`), the same way via `/datenschutz` |
@@ -181,7 +199,7 @@ Then *Generate a new client secret* and set `GITHUB_CLIENT_ID` and `GITHUB_CLIEN
 
 ### SMTP
 
-Any SMTP account that may send as `SMTP_FROM` (e.g. `marketplace@flowplan.org`; SPF/DKIM for the domain). Port 587 with STARTTLS, or 465 with `SMTP_SECURE=true`. Used for sign-in links (valid 15 minutes, once; the link opens a confirm page so mail scanners don't use it up), review decisions, unpublish/republish notes and the account deletion confirmation. GitHub-only accounts get none of these; `/me` shows every decision with its message.
+Any SMTP account that may send as `SMTP_FROM` (e.g. `marketplace@flowplan.org`; SPF/DKIM for the domain). Port 587 with STARTTLS, or 465 with `SMTP_SECURE=true`. Used for sign-in links (valid 15 minutes, once; the link opens a confirm page so mail scanners don't use it up), review decisions, unpublish/republish notes, admin edits and the account deletion confirmation. GitHub-only accounts get none of these; `/me` shows every decision with its message.
 
 ### Admin token (flowplan-admin)
 
