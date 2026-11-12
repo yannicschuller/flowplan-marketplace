@@ -5,6 +5,7 @@ import { config } from "@/lib/config";
 import { LocaleProvider } from "@/components/i18n";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { InstanceFromFragment } from "@/components/instance-from-fragment";
 import { translate } from "@/lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SiteHeader />
           <main id="main">{children}</main>
           <SiteFooter />
+          <InstanceFromFragment />
         </LocaleProvider>
       </body>
     </html>

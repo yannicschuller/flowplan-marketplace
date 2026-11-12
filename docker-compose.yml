@@ -17,6 +17,8 @@ services:
       # Impressum and privacy policy (https); these are the defaults.
       MARKETPLACE_IMPRESSUM_URL: https://flowplan.org/impressum
       MARKETPLACE_PRIVACY_URL: https://flowplan.org/datenschutz
+      # Preselected instance of "In Flowplan öffnen" (https; "off" = ask for the address).
+      MARKETPLACE_DEFAULT_INSTANCE: https://app.flowplan.org
     volumes:
       - marketplace-data:/app/data
     # A TLS-terminating reverse proxy in front; keep this port on localhost.
