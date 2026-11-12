@@ -6,7 +6,9 @@ import { localized, type Locale, translate } from "@/lib/i18n";
 import { parseJsonColumn, type PreviewInfo, type PublicRow } from "@/lib/store";
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
 
-export const previewSrc = (slug: string, version: number, n = 1) => `/api/templates/${slug}/previews/${n}?version=${version}`;
+// `r` (the package's SHA-256 prefix) changes when an admin edits the previews of a version in place.
+export const previewSrc = (slug: string, version: { number: number; sha256: string }, n = 1) =>
+  `/api/templates/${slug}/previews/${n}?version=${version.number}&r=${version.sha256.slice(0, 12)}`;
 
 export function TemplateCard({ row, locale }: { row: PublicRow; locale: Locale }) {
   const t = translate(locale);
@@ -17,7 +19,7 @@ export function TemplateCard({ row, locale }: { row: PublicRow; locale: Locale }
         <div className={`card-preview kind-${row.kind}`}>
           {previews.length ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewSrc(row.slug, row.number)} alt="" loading="lazy" width={480} height={300} />
+            <img src={previewSrc(row.slug, row)} alt="" loading="lazy" width={480} height={300} />
           ) : (
             <span className="card-placeholder">
               <KindIcon kind={row.kind} size={40} />

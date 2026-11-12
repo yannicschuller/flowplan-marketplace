@@ -1245,6 +1245,9 @@ textarea {
 .review-message.decision.published {
   border-left-color: var(--ok);
 }
+.review-message.admin-edit {
+  border-left-color: var(--blue);
+}
 .profile input {
   max-width: 320px;
 }

@@ -2,7 +2,7 @@
 // and Response (app/api/** only forwards to these, tests call them directly).
 import { config } from "./config";
 import { CORS_HEADERS, HttpError, clientIp, cookie, json, readBody, readJson, requireSameOrigin, safeNext, setCookie } from "./http";
-import { countDownload, downloadable, editSubmission, parseJsonColumn, publicTemplate, publicTemplates, submit, templateDetail, templateSummary, withdraw, type PreviewInfo } from "./store";
+import { countDownload, downloadable, editSubmission, movedSlug, parseJsonColumn, publicTemplate, publicTemplates, submit, templateDetail, templateSummary, withdraw, type PreviewInfo } from "./store";
 import { readPackage, readPreview } from "./storage";
 import { IMAGE_MIME } from "./images";
 import { createReport } from "./reports";
@@ -59,9 +59,22 @@ export function listTemplatesRoute(request: Request) {
   return json({ templates: rows.map(templateSummary), total }, { cors: true, headers: { "Cache-Control": "public, max-age=60" } });
 }
 
-export function templateRoute(slug: string) {
+// A renamed template (lib/admin-edit.ts): the old address answers 308 with
+// the same path and query under the new slug.
+function moved(request: Request | null, slug: string, rest = ""): Response | null {
+  const to = movedSlug(slug);
+  if (!to) return null;
+  const search = request ? new URL(request.url).search : "";
+  return new Response(null, { status: 308, headers: { ...CORS_HEADERS, Location: `/api/templates/${encodeURIComponent(to)}${rest}${search}`, "Cache-Control": "no-store" } });
+}
+
+export function templateRoute(slug: string, request: Request | null = null) {
   const row = publicTemplate(slug);
-  if (!row) throw new HttpError(404, "not_found", "Template not found.");
+  if (!row) {
+    const redirect = moved(request, slug);
+    if (redirect) return redirect;
+    throw new HttpError(404, "not_found", "Template not found.");
+  }
   return json({ template: templateDetail(row) }, { cors: true, headers: { "Cache-Control": "public, max-age=60" } });
 }
 
@@ -72,7 +85,11 @@ export function downloadRoute(request: Request, slug: string) {
   const number = p.get("version") ? Number(p.get("version")) : null;
   if (number !== null && (!Number.isInteger(number) || number < 1)) throw new HttpError(400, "invalid_version", "version must be a positive number.");
   const found = downloadable(slug, number);
-  if (!found) throw new HttpError(404, "not_found", "Template or version not found.");
+  if (!found) {
+    const redirect = moved(request, slug, "/download");
+    if (redirect) return redirect;
+    throw new HttpError(404, "not_found", "Template or version not found.");
+  }
   const bytes = readPackage(found.version.id);
   const via = p.get("via") === "open" ? "open" : "download";
   // A HEAD or a repeated request from the same visitor within a minute does not count twice.
@@ -101,6 +118,10 @@ export function previewRoute(request: Request, slug: string, n: number) {
   const p = new URL(request.url).searchParams;
   const found = downloadable(slug, p.get("version") ? Number(p.get("version")) : null);
   const preview = found && parseJsonColumn<PreviewInfo[]>(found.version.previews, []).find((x) => x.n === n);
+  if (!found) {
+    const redirect = moved(request, slug, `/previews/${Math.trunc(n)}`);
+    if (redirect) return redirect;
+  }
   if (!found || !preview) throw new HttpError(404, "not_found", "Preview not found.");
   return new Response(new Uint8Array(readPreview(found.version.id, n, preview.type)), {
     headers: {

@@ -115,6 +115,18 @@ const MIGRATIONS: string[] = [
    ALTER TABLE templates ADD COLUMN official_key TEXT;
    ALTER TABLE templates ADD COLUMN official_sha256 TEXT;
    CREATE UNIQUE INDEX templates_official_key ON templates(official_key) WHERE official_key IS NOT NULL;`,
+  // 5: admin edits – per version the list of edits made in flowplan-admin
+  // (who, when, which fields, the message to the author), per template the
+  // metadata an admin set on an official template (the seed keeps it), and
+  // the old addresses of renamed templates (/t/<old> → 308 to the new one).
+  `ALTER TABLE versions ADD COLUMN admin_edits TEXT NOT NULL DEFAULT '[]';
+   ALTER TABLE templates ADD COLUMN admin_overrides TEXT NOT NULL DEFAULT '{}';
+   CREATE TABLE slug_redirects (
+     slug TEXT PRIMARY KEY,
+     template_id TEXT NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX slug_redirects_template ON slug_redirects(template_id);`,
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 

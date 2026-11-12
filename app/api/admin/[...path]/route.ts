@@ -10,3 +10,5 @@ const route = async (request: Request, ctx: Ctx) => {
 };
 export const GET = route;
 export const POST = route;
+export const PATCH = route;
+export const DELETE = route;
