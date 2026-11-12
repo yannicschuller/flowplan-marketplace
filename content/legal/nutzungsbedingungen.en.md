@@ -1,6 +1,6 @@
 # Terms of use
 
-Last updated: November 2026
+Last updated: 12 November 2026
 
 These terms apply to the use of the Flowplan Marketplace at marketplace.flowplan.org (the "Marketplace"). It is operated by the provider named in the [legal notice](https://flowplan.org/impressum) ("we"). The Marketplace is free of charge.
 
@@ -34,6 +34,7 @@ With every submission you confirm that:
 
 - We review every submission and every new version before it appears. Automatic checks help, but they don't replace review by a person.
 - We may publish a submission, ask for changes or reject it. There is no right to publication.
+- We may adjust the title, description, category, tags, address (slug) and preview images of a submitted or published template, for example to correct mistakes, make it clearer or make it easier to find. We don't change the template's content or its licence when doing so. For a published template we tell you by e-mail what we changed and show it under "My submissions". If you don't agree with a change, write to us or withdraw the template.
 - We may unpublish a published template. Reasons include a justified report, a breach of these terms, or a template that no longer works with Flowplan. We will tell you why by e-mail. If your account has no e-mail address (sign-in with GitHub), the reason is shown under "My submissions".
 - You can withdraw your own submissions at any time.
 

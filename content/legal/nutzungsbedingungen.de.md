@@ -1,6 +1,6 @@
 # Nutzungsbedingungen
 
-Stand: November 2026
+Stand: 12. November 2026
 
 Diese Bedingungen gelten für die Nutzung des Flowplan Marketplace unter marketplace.flowplan.org („Marketplace“). Betreiber ist der im [Impressum](https://flowplan.org/impressum) genannte Anbieter („wir“). Der Marketplace ist kostenlos.
 
@@ -34,6 +34,7 @@ Mit jeder Einreichung bestätigst du:
 
 - Jede Einreichung und jede neue Version prüfen wir, bevor sie erscheint. Automatische Prüfungen helfen dabei, ersetzen aber nicht die Prüfung durch einen Menschen.
 - Wir können eine Einreichung veröffentlichen, um Änderungen bitten oder ablehnen. Ein Anspruch auf Veröffentlichung besteht nicht.
+- Wir dürfen Titel, Beschreibung, Kategorie, Schlagwörter, Adresse (Slug) und Vorschaubilder einer eingereichten oder veröffentlichten Vorlage anpassen, etwa um Fehler zu korrigieren, sie verständlicher zu machen oder sie besser auffindbar zu machen. Den Inhalt der Vorlage und ihre Lizenz ändern wir dabei nicht. Bei einer veröffentlichten Vorlage sagen wir dir per E-Mail, was wir geändert haben, und zeigen es unter „Meine Einreichungen“. Bist du mit einer Änderung nicht einverstanden, schreib uns oder zieh die Vorlage zurück.
 - Veröffentlichte Vorlagen können wir zurückziehen, zum Beispiel nach einer berechtigten Meldung, bei Verstößen gegen diese Bedingungen oder wenn eine Vorlage nicht mehr mit Flowplan funktioniert. Wir sagen dir per E-Mail, warum. Hat dein Konto keine E-Mail-Adresse (Anmeldung über GitHub), steht der Grund unter „Meine Einreichungen“.
 - Deine eigenen Einreichungen kannst du jederzeit zurückziehen.
 
