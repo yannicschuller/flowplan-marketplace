@@ -7,7 +7,7 @@ import { readPackage, readPreview } from "./storage";
 import { IMAGE_MIME } from "./images";
 import { createReport } from "./reports";
 import { hit, ipKey } from "./rate-limit";
-import { inspectPackage, LIMITS } from "./package";
+import { forSubmission, inspectPackage, LIMITS } from "./package";
 import { viewerFromEntries } from "./workflow-viewer";
 import { countable, firstToday } from "./download-count";
 import { LOCALE_COOKIE, pickLocale } from "./i18n";
@@ -148,7 +148,9 @@ export async function inspectRoute(request: Request) {
   requireSameOrigin(request);
   hit(`inspect:${ipKey(clientIp(request))}`, 60, 3600);
   const bytes = await readBody(request, LIMITS.packageBytes + 1024);
-  const inspection = await inspectPackage(bytes);
+  // Checked as a submission: a package without its English title (from an
+  // older Flowplan) is refused here already, with the reason.
+  const inspection = forSubmission(await inspectPackage(bytes));
   // A workflow's diagram and summary in the visitor's language (the submit preview).
   const viewer =
     inspection.manifest?.kind === "workflow" && inspection.analysis.workflow

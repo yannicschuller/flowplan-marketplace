@@ -11,7 +11,7 @@ A Next.js 16 app (App Router, TypeScript strict) with one SQLite database (`node
 - **Browse** (`/`, `/t/<slug>`, `/u/<author>`): featured, newest, popular, categories, search; template pages with previews, description (German or English by the visitor's language), author, licence, version history, download counts, *In Flowplan öffnen*, *Herunterladen*, *Melden*.
 - **Submit** (`/submit`, `/me`): upload a `.flowplan-template` file or receive it from a Flowplan instance; automatic checks; licence (CC BY 4.0 by default, CC0, MIT) and rights confirmation; status per version with the review team's message (changes requested, rejected, unpublished with reason – the only channel for GitHub-only accounts), edit, new version, withdraw; *Konto löschen* / *Delete account* (see [Accounts and retention](#accounts-and-retention)).
 - **Review** happens in flowplan-admin through the [admin API](#admin-api).
-- Languages: German and English (browser language; switch in the footer).
+- Languages: German and English (browser language; *DE / EN* switch in the header and in the footer, both `/lang/de|en?next=<path>`, which only sets the language cookie).
 - Privacy: no trackers, no visitor cookies (only the language choice when a visitor picks one), IP addresses only as a daily HMAC for rate limits, only anonymous download/open counters.
 
 ### Package format (`flowplan-marketplace-1`)
@@ -19,7 +19,7 @@ A Next.js 16 app (App Router, TypeScript strict) with one SQLite database (`node
 A `*.flowplan-template` file is a ZIP:
 
 ```
-template.json            format, kind, title, titles{de,en}?, summary{de,en}, description{de,en}?,
+template.json            format, kind, title, titles{de?,en}, summary{de,en}, description{de,en}?,
                          category, tags[≤10], minVersion, language, payload
 payload/…                the kind's own exchange format, unchanged
                          document/database: flowplan-template-1 ZIP · workflow: flowplan.workflow JSON
@@ -28,7 +28,9 @@ payload/…                the kind's own exchange format, unchanged
 preview/1.webp … 4       optional, ≤ 1 MB each, WebP/PNG/JPEG
 ```
 
-`title` is the template's title in its own language; the optional `titles {de?, en?}` (each ≤ 120 characters) is the title per interface language – cards, template pages, search and sorting by title use the visitor's (else the other one, else `title`). Readers that don't know `titles` keep using `title`. Limits: 25 MB per package, 64 KB for `template.json`. Downloads carry `template.json` with the reviewed metadata plus `license`, `author {name, handle}` and `marketplace {id, slug, version, url}`.
+`title` is the template's title in its own language; `titles {de?, en?}` (each ≤ 120 characters) is the title per interface language – cards, template pages, search and sorting by title use the visitor's (else the other one, else `title`). Readers that don't know `titles` keep using `title`. Limits: 25 MB per package, 64 KB for `template.json`. Downloads carry `template.json` with the reviewed metadata plus `license`, `author {name, handle}` and `marketplace {id, slug, version, url}`.
+
+**The English title is required for everything an author submits** (new template, new version, a new package for a waiting submission): `titles.en` must be in the package (Flowplan's publish dialog asks for it – *Titel (Englisch)*, the German one optional) and `titleEn` in the submit form. A package without it – from a Flowplan before this rule, or made by hand – gets the error finding `title-en-missing` (at `titles.en`: *update Flowplan and publish from there again*) already in `POST /api/packages/inspect`, so the submit page shows it right after the hand-over or upload, and `POST /api/submissions` answers `422 package_invalid` with it; a form without `titleEn` answers `400 invalid_form` with `fields: ["titleEn"]`. For submissions the marketplace sets `title` itself: the German title for German content (`language: "de"`) when there is one, else the English one. The package check as such (official seed, an admin's package replacement, stored templates) still accepts packages without `titles`: published templates from before the rule keep their one title in both languages, nothing is guessed.
 
 ### Automatic checks
 
@@ -138,7 +140,7 @@ Every submission in the queue carries `security: {verdict, label {de, en}, count
 
 `lib/admin-edit.ts`. Two scopes, the same endpoints: **`templates/:id`** edits the template's published version (listed or unpublished; a withdrawn one answers `409 withdrawn`), **`submissions/:id`** a version waiting for review (other states: `409 not_in_review`).
 
-`PATCH` takes JSON with any of `title`, `titles: {de?, en?}` (a changed `title` without `titles` empties the per-language titles, so the new title shows in both languages), `summary: {de?, en?}`, `description: {de?, en?}` (Markdown, shown as before), `category`, `tags`, `language`, `minVersion`, `slug`, plus `notify` (boolean), `message` (to the author, ≤ 2000) and `also` (`["previews", "package"]`: changes made through the other endpoints, named in the same e-mail). Validation is the submit form's (`400 invalid_form` with `fields`); `license` is the author's choice (`400 license_readonly`), other keys `400 unknown_field`, nothing changed `400 no_changes`. The answer: `{ok, scope, templateId, versionId, slug, number, status, sha256, size, findings, official, adminOverrides, changed, notified}`.
+`PATCH` takes JSON with any of `title`, `titles: {de?, en?}` (a changed `title` without `titles` becomes the English title and empties the German one, so the new title shows in both languages; an English title, once there, can be changed but not removed – `400 invalid_form` with `fields: ["titles.en"]`), `summary: {de?, en?}`, `description: {de?, en?}` (Markdown, shown as before), `category`, `tags`, `language`, `minVersion`, `slug`, plus `notify` (boolean), `message` (to the author, ≤ 2000) and `also` (`["previews", "package"]`: changes made through the other endpoints, named in the same e-mail). Validation is the submit form's (`400 invalid_form` with `fields`); `license` is the author's choice (`400 license_readonly`), other keys `400 unknown_field`, nothing changed `400 no_changes`. The answer: `{ok, scope, templateId, versionId, slug, number, status, sha256, size, findings, official, adminOverrides, changed, notified}`.
 
 - **In place, no new version.** Metadata and previews change the version itself: its number and status stay, the package is rebuilt – the payload entries are copied unchanged, `template.json` and `preview/*` are new – and checked again like a submission (`422 package_invalid` with `findings` if not); SHA-256, size and findings are recomputed (`X-Template-Sha256` of the download matches). This is simpler and more robust than a new version for what is only metadata: no second review, no pending-version conflicts, the version history and download counts stay as they are. Preview URLs carry `&r=<hash>` so cached images are replaced.
 - **Recorded on the version** as `adminEdits` (`{at, by, fields, message, notify, notified}`, in the submission detail) and in the audit log: `admin_edit` with `fields` and `changes` (before/after for every field, only the lengths for descriptions), `admin_previews_added`, `admin_previews_reordered`, `admin_preview_removed`, `admin_package_replaced` – actor as everywhere (token label + `X-Admin-User`).

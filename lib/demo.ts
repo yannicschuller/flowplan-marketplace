@@ -20,6 +20,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "document",
       title: "Meeting-Protokoll",
+      titles: { de: "Meeting-Protokoll", en: "Meeting minutes" },
       summary: { de: "Agenda, Entscheidungen und Aufgaben in einer klaren Struktur – für jedes Teammeeting.", en: "Agenda, decisions and action items in one clear structure – for every team meeting." },
       description: {
         de: "## Was drin ist\n\n- **Agenda** mit Zeitfenstern\n- Abschnitt für *Entscheidungen*\n- Aufgabenliste mit Zuständigen\n\nFunktioniert gut zusammen mit der Datenbank-Vorlage [Aufgaben-Board](https://marketplace.flowplan.org/t/aufgaben-board).\n\n> Tipp: Lege die Vorlage als Standard für deinen Meeting-Bereich fest.",
@@ -57,6 +58,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "database",
       title: "Aufgaben-Board",
+      titles: { de: "Aufgaben-Board", en: "Task board" },
       summary: { de: "Kanban-Board mit Status, Priorität und Fälligkeit – sofort einsatzbereit.", en: "Kanban board with status, priority and due date – ready to use." },
       description: { de: "Ein schlankes Board für kleine Teams. Spalten: *Offen*, *In Arbeit*, *Erledigt*.", en: "A lean board for small teams. Columns: *Open*, *In progress*, *Done*." },
       category: "projects",
@@ -119,6 +121,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "workflow",
       title: "Formularantwort an Slack",
+      titles: { de: "Formularantwort an Slack", en: "Form response to Slack" },
       summary: { de: "Neue Formularantworten zusammenfassen und in einen Slack-Kanal posten.", en: "Summarise new form answers and post them to a Slack channel." },
       description: {
         de: "Wenn jemand dein Formular ausfüllt, fasst ein KI-Schritt die Antwort zusammen und schickt sie per Webhook an Slack.\n\nNach dem Import: Webhook-Adresse unter **Zugangsdaten** eintragen und den Workflow aktivieren – er kommt pausiert an.",
@@ -152,6 +155,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "whiteboard",
       title: "Retrospektive",
+      titles: { de: "Retrospektive", en: "Retrospective" },
       summary: { de: "Gut, schlecht, Ideen: drei Spalten für die Sprint-Retro auf dem Whiteboard.", en: "Good, bad, ideas: three columns for your sprint retro on the whiteboard." },
       category: "meetings",
       tags: ["retro", "agile"],
@@ -175,6 +179,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "appearance",
       title: "Tannengrün",
+      titles: { de: "Tannengrün", en: "Fir green" },
       summary: { de: "Ruhiges Tannengrün als Akzent – angenehm in Hell und Dunkel.", en: "Calm fir green as the accent – easy on the eyes in light and dark." },
       category: "other",
       tags: ["theme", "grün"],
@@ -210,6 +215,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "workflow",
       title: "Wochenbericht per E-Mail",
+      titles: { de: "Wochenbericht per E-Mail", en: "Weekly report by e-mail" },
       summary: { de: "Jeden Freitag eine E-Mail mit allen erledigten Aufgaben der Woche.", en: "Every Friday an e-mail with all tasks done this week." },
       category: "planning",
       tags: ["bericht", "e-mail"],
@@ -238,6 +244,7 @@ const demos = (): Demo[] => [
     spec: {
       kind: "document",
       title: "OKR-Planung",
+      titles: { de: "OKR-Planung", en: "OKR planning" },
       summary: { de: "Ziele und Schlüsselergebnisse für das Quartal festhalten." },
       category: "planning",
       tags: ["okr", "ziele"],
@@ -260,7 +267,8 @@ export async function seedDemo() {
   for (const d of demos()) {
     const s = d.spec;
     const result = await submit(authors[d.author], buildSamplePackage(s), {
-      title: s.title,
+      titleDe: s.titles?.de ?? (s.language === "de" ? s.title : ""),
+      titleEn: s.titles?.en ?? s.title,
       summaryDe: s.summary.de ?? "",
       summaryEn: s.summary.en ?? "",
       descriptionDe: s.description?.de ?? "",

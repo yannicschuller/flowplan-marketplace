@@ -42,8 +42,12 @@ export const allKindPackages = () => [
   buildSamplePackage({ kind: "appearance", title: "Look", summary: { de: "Look" }, category: "other", payload: [appearancePayload({ accent: "#2f6f5e" })] }),
   buildSamplePackage({ kind: "link-rules", title: "Links", summary: { de: "Links" }, category: "knowledge", payload: [linkRulesPayload([{ name: "Issue", pattern: "#(\\d+)", template: "https://example.org/issues/$1" }])] }),
 ];
+// The author's form: the English title is required; by default both titles
+// are the given `title` (so tests that only set `title` keep their title).
 export const form = (over: Record<string, unknown> = {}) => ({
   title: "Testvorlage",
+  titleDe: typeof over.title === "string" ? over.title : "Testvorlage",
+  titleEn: typeof over.title === "string" ? over.title : "Testvorlage",
   summaryDe: "Kurz",
   summaryEn: "Short",
   descriptionDe: "",

@@ -1,7 +1,7 @@
 import { LOCALE_COOKIE, isLocale } from "@/lib/i18n";
 import { safeNext, setCookie } from "@/lib/http";
 
-// The language switch in the footer: remembers the choice (the only cookie a
+// The language switches in the header and footer: remember the choice (the only cookie a
 // visitor gets, and only when they ask for it) and goes back.
 export async function GET(request: Request, ctx: { params: Promise<{ locale: string }> }) {
   const { locale } = await ctx.params;

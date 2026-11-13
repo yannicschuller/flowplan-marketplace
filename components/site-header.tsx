@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { BrandMark } from "./brand-mark";
-import { pageSession, pageT } from "@/lib/page";
+import { pageBack, pageSession, pageT } from "@/lib/page";
+import { LanguageSwitch } from "./language-switch";
 import { Plus } from "@phosphor-icons/react/dist/ssr/Plus";
 import { User } from "@phosphor-icons/react/dist/ssr/User";
 
 export async function SiteHeader() {
-  const [{ t }, session] = await Promise.all([pageT(), pageSession()]);
+  const [{ t, locale }, session, back] = await Promise.all([pageT(), pageSession(), pageBack()]);
   return (
     <header className="site-header">
       <div className="bar">
@@ -29,6 +30,7 @@ export async function SiteHeader() {
             <Link href="/login">{t("Anmelden", "Sign in")}</Link>
           )}
         </nav>
+        <LanguageSwitch locale={locale} back={back} t={t} />
       </div>
     </header>
   );

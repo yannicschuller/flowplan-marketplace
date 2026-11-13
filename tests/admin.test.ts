@@ -93,7 +93,7 @@ test("updates: diff, published version stays until the new one is accepted", asy
   assert.equal(conflict.data.error, "pending_version");
   const d = (await call("GET", `submissions/${v2.data.versionId}`)).data.submission;
   assert.equal(d.isUpdate, true);
-  assert.deepEqual(d.diff.changedFields, ["title"]);
+  assert.deepEqual(d.diff.changedFields, ["title", "title.de", "title.en"]);
   assert.equal(d.diff.previewsBefore, 1);
   assert.equal(d.diff.previewsAfter, 0);
   assert.equal(publicTemplates({ q: "Testvorlage" }).rows[0]?.number, 1);

@@ -21,5 +21,10 @@ export const FIELD_LABELS: Record<string, [string, string]> = {
   previews: ["Vorschaubilder", "previews"],
   package: ["Paket", "package"],
 };
-export const fieldLabels = (fields: string[], lang: "de" | "en") => fields.map((f) => FIELD_LABELS[f]?.[lang === "de" ? 0 : 1] ?? f).join(", ");
+// "Titel" covers the per-language titles that changed with it.
+export const fieldLabels = (fields: string[], lang: "de" | "en") =>
+  fields
+    .filter((f) => !(fields.includes("title") && (f === "title.de" || f === "title.en")))
+    .map((f) => FIELD_LABELS[f]?.[lang === "de" ? 0 : 1] ?? f)
+    .join(", ");
 

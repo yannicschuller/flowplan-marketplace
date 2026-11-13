@@ -6,7 +6,7 @@ import { all, newId, now, one, run, transaction } from "./db";
 import { CATEGORIES, LANGUAGES, LICENSES, type Kind } from "./catalog";
 import { HttpError } from "./http";
 import { slugify, type User } from "./auth";
-import { buildPackage, inspectPackage, LIMITS, versionPattern, type Analysis, type Finding, type Inspection } from "./package";
+import { buildPackage, forSubmission, inspectPackage, LIMITS, versionPattern, type Analysis, type Finding, type Inspection } from "./package";
 import { readPackage, savePackage, savePreviews } from "./storage";
 import { PENDING, transition, type Status } from "./status";
 import { hit } from "./rate-limit";
@@ -76,7 +76,9 @@ export type PreviewInfo = { n: number; type: ImageType };
 const text = (max: number) => z.string().trim().max(max).default("");
 export const submissionFormSchema = z.object({
   title: z.string().trim().min(2).max(LIMITS.title),
-  // Optional: the title in German and English (template.json `titles`).
+  // The title in German and English (template.json `titles`): authors must
+  // give the English one (parseAuthorForm); admin edits and the official
+  // seed go through parseSubmissionForm.
   titleDe: text(LIMITS.title),
   titleEn: text(LIMITS.title),
   summaryDe: text(LIMITS.summary),
@@ -105,6 +107,25 @@ export function parseSubmissionForm(input: unknown): SubmissionForm {
     });
   if (!parsed.data.summaryDe && !parsed.data.summaryEn) throw new HttpError(400, "invalid_form", "A summary is needed.", { fields: ["summaryDe", "summaryEn"] });
   return parsed.data;
+}
+
+// The title in the template's own language (template.json `title`, for
+// readers that don't know `titles`): the German one for German content when
+// there is one, else the English one.
+export const ownTitle = (language: unknown, de: string, en: string) => (language === "de" && de ? de : en);
+
+// What an author sends (new template, new version, edited submission): the
+// English title is required, the German one optional, and `title` follows
+// from them (a `title` sent along is ignored).
+export function parseAuthorForm(input: unknown): SubmissionForm {
+  const raw: Record<string, unknown> = input && typeof input === "object" && !Array.isArray(input) ? { ...(input as Record<string, unknown>) } : {};
+  const de = typeof raw.titleDe === "string" ? raw.titleDe.trim() : "";
+  const en = typeof raw.titleEn === "string" ? raw.titleEn.trim() : "";
+  if (!en) throw new HttpError(400, "invalid_form", "An English title is needed (titleEn).", { fields: ["titleEn"] });
+  if (de.length === 1) throw new HttpError(400, "invalid_form", "The German title needs at least 2 characters.", { fields: ["titleDe"] });
+  if (en.length === 1) throw new HttpError(400, "invalid_form", "The English title needs at least 2 characters.", { fields: ["titleEn"] });
+  raw.title = ownTitle(raw.language, de, en);
+  return parseSubmissionForm(raw);
 }
 
 // A slug is taken by a template's current address or by an old address that
@@ -179,9 +200,9 @@ const rejectFindings = (inspection: Inspection) => {
 
 // A new template, or a new version of one of the author's templates.
 export async function submit(user: User, packageBytes: Uint8Array, formInput: unknown, opts: { templateId?: string | null } = {}) {
-  const form = parseSubmissionForm(formInput);
+  const form = parseAuthorForm(formInput);
   hit(`submit:${user.id}`, 20, 86_400);
-  const inspection = await inspectPackage(packageBytes);
+  const inspection = forSubmission(await inspectPackage(packageBytes));
   rejectFindings(inspection);
   const kind = inspection.manifest!.kind;
   const at = now();
@@ -266,12 +287,14 @@ export const nextVersionNumber = (templateId: string) => (one<{ n: number | null
 // requested → submitted again). Without a new package the stored one is
 // checked again and rewritten with the new metadata.
 export async function editSubmission(user: User, versionId: string, packageBytes: Uint8Array | null, formInput: unknown) {
-  const form = parseSubmissionForm(formInput);
+  const form = parseAuthorForm(formInput);
   hit(`submit:${user.id}`, 40, 86_400);
   const version = requireOwnVersion(user, versionId);
   const next = transition(version.status, version.status === "changes_requested" ? "resubmit" : "edit", "author");
   const template = one<TemplateRow>("SELECT * FROM templates WHERE id=?", version.template_id)!;
-  const inspection = await inspectPackage(packageBytes ?? readPackage(version.id));
+  // A new package must bring its English title; the stored one was rebuilt
+  // with the form's titles (and may predate the rule).
+  const inspection = packageBytes ? forSubmission(await inspectPackage(packageBytes)) : await inspectPackage(readPackage(version.id));
   rejectFindings(inspection);
   if (inspection.manifest!.kind !== template.kind) throw new HttpError(409, "kind_mismatch", "A new version must be of the same kind.");
   const at = now();

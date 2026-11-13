@@ -322,6 +322,38 @@ textarea {
 .nav .nav-submit {
   color: var(--blue);
 }
+/* DE / EN in the header (components/language-switch.tsx): two links, the
+   current language marked; the same /lang routes as the footer switch. */
+.header-lang {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+}
+.header-lang a {
+  padding: 4px 8px;
+  border-radius: 7px;
+  color: var(--secondary);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.header-lang a:hover {
+  background: var(--hover);
+  color: var(--text);
+  text-decoration: none;
+}
+.header-lang a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+.header-lang a[aria-current="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
 .site-footer {
   border-top: 1px solid var(--border);
   background: var(--sidebar);
@@ -1119,6 +1151,12 @@ textarea {
   justify-self: end;
   font-size: 12px;
 }
+.field small.field-hint {
+  justify-self: start;
+}
+.field input[aria-invalid="true"] {
+  border-color: var(--err);
+}
 .license {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1341,6 +1379,18 @@ textarea {
     min-height: 40px;
     justify-content: center;
     white-space: nowrap;
+  }
+  .header-lang {
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+  .header-lang a {
+    min-width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
   }
   .nav-label {
     position: absolute;

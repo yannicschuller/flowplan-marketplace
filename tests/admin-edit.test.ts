@@ -86,7 +86,8 @@ test("published: metadata changes the version in place, payload untouched, autho
     message: "Tippfehler im Titel korrigiert.",
   });
   assert.equal(r.status, 200, JSON.stringify(r.data));
-  assert.deepEqual(r.data.changed, ["title", "summary.en", "description.de", "category", "tags"]);
+  // A new title alone becomes the English one, the German one goes (German pages fall back to it).
+  assert.deepEqual(r.data.changed, ["title", "title.de", "title.en", "summary.en", "description.de", "category", "tags"]);
   assert.equal(r.data.number, 1);
   assert.equal(r.data.versionId, t.versionId);
   const after = versionOf(t.versionId);
@@ -130,7 +131,7 @@ test("published: metadata changes the version in place, payload untouched, autho
   assert.match(mail.text, /Tippfehler im Titel korrigiert\./);
   // /me lists it (GitHub-only accounts see it only there).
   const mine = mySubmissions(t.a.user)[0].versions[0];
-  assert.equal(JSON.parse(mine.admin_edits)[0].fields.length, 5);
+  assert.equal(JSON.parse(mine.admin_edits)[0].fields.length, 7);
   // The admin detail shows the edits.
   const d = (await call("GET", `submissions/${t.versionId}`)).data.submission;
   assert.equal(d.adminEdits.length, 1);
@@ -330,11 +331,11 @@ test("official templates: admin-edited metadata and previews survive the next se
   const r = await patch(`templates/meeting-notes`, { title: "Besprechung (Admin)", tags: ["meeting", "admin"] });
   assert.equal(r.status, 200, JSON.stringify(r.data));
   assert.equal(r.data.official, true);
-  assert.deepEqual(r.data.adminOverrides, ["title", "tags"]);
+  assert.deepEqual(r.data.adminOverrides, ["title", "title.en", "tags"]);
   assert.equal(outbox().length, mails, "the built-in author gets no e-mail");
   await call("POST", `templates/meeting-notes/previews`, { body: files("preview", [png("#ff00ff"), "x.png"]) });
   const listed = (await call("GET", "templates")).data.templates.find((x: any) => x.slug === "meeting-notes");
-  assert.deepEqual(listed.adminOverrides, ["title", "tags", "previews"]);
+  assert.deepEqual(listed.adminOverrides, ["title", "title.en", "tags", "previews"]);
 
   // Unchanged file: nothing happens. Changed file: new payload, admin metadata and previews kept.
   await seedOfficial({ dir, log: { info() {}, warn() {} } });
@@ -349,6 +350,6 @@ test("official templates: admin-edited metadata and previews survive the next se
   assert.equal(JSON.parse(next.previews).length, 2);
   assert.equal((await manifestOf(next.id)).title, "Besprechung (Admin)");
   const seedAudit = one<any>("SELECT details FROM audit WHERE action='official_updated' ORDER BY id DESC LIMIT 1")!;
-  assert.deepEqual(JSON.parse(seedAudit.details).adminOverrides, ["title", "tags", "previews"]);
+  assert.deepEqual(JSON.parse(seedAudit.details).adminOverrides, ["title", "title.en", "tags", "previews"]);
   assert.notEqual(row.id, next.id);
 });
