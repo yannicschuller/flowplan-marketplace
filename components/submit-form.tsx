@@ -22,7 +22,10 @@ import { WorkflowSummary } from "./workflow-summary";
 import type { ViewerData } from "@/lib/workflow-viewer";
 
 export type Fields = {
-  title: string;
+  // The English title is required, the German one optional; the server
+  // derives template.json `title` from them (lib/store.ts parseAuthorForm).
+  titleDe: string;
+  titleEn: string;
   summaryDe: string;
   summaryEn: string;
   descriptionDe: string;
@@ -42,7 +45,7 @@ export type SubmitMode =
 type Finding = { level: "error" | "warning" | "info"; code: string; de: string; en: string; at?: string };
 type Inspection = {
   ok: boolean;
-  manifest: { kind: string; title: string; summary: { de?: string; en?: string }; description?: { de?: string; en?: string }; category: string; tags: string[]; minVersion: string; language: string } | null;
+  manifest: { kind: string; title: string; titles?: { de?: string; en?: string }; summary: { de?: string; en?: string }; description?: { de?: string; en?: string }; category: string; tags: string[]; minVersion: string; language: string } | null;
   findings: Finding[];
   size: number;
   previews: { n: number; type: string; data: string }[];
@@ -50,7 +53,7 @@ type Inspection = {
   viewer?: ViewerData | null;
 };
 
-const EMPTY: Fields = { title: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
+const EMPTY: Fields = { titleDe: "", titleEn: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
 
 export function SubmitForm({ session, mode, initial, login, returnTo }: { session: { name: string; csrf: string } | null; mode: SubmitMode; initial: Fields | null; login: LoginConfig; returnTo: string }) {
   const t = useT();
@@ -61,7 +64,7 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
   const [fields, setFields] = useState<Fields>(initial ?? EMPTY);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [handover, setHandover] = useState<"none" | "waiting" | "received" | "no-opener">("none");
-  const [status, setStatus] = useState<{ kind: "idle" | "sending" } | { kind: "error"; text: string; findings?: Finding[] }>({ kind: "idle" });
+  const [status, setStatus] = useState<{ kind: "idle" | "sending" } | { kind: "error"; text: string; findings?: Finding[]; fields?: string[] }>({ kind: "idle" });
   const prefilled = useRef(!!initial);
 
   const accept = useCallback(
@@ -84,7 +87,9 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
           prefilled.current = true;
           setFields((f) => ({
             ...f,
-            title: m.title,
+            // Only what the package says – no guessing from `title`.
+            titleDe: m.titles?.de ?? "",
+            titleEn: m.titles?.en ?? "",
             summaryDe: m.summary.de ?? "",
             summaryEn: m.summary.en ?? "",
             descriptionDe: m.description?.de ?? "",
@@ -94,7 +99,10 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
             language: m.language,
             minVersion: m.minVersion,
           }));
-        } else if (m) setFields((f) => ({ ...f, minVersion: m.minVersion }));
+        } else if (m)
+          // A new version or an edit keeps the stored details; titles that
+          // are still missing come from the package.
+          setFields((f) => ({ ...f, minVersion: m.minVersion, titleDe: f.titleDe || m.titles?.de || "", titleEn: f.titleEn || m.titles?.en || "" }));
       } catch {
         setInspection({ ok: false, manifest: null, findings: [{ level: "error", code: "inspect-failed", de: "Das Paket konnte nicht geprüft werden.", en: "The package could not be checked." }], size: next.bytes.byteLength, previews: [] });
       } finally {
@@ -148,7 +156,7 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
   const needsPackage = mode.type !== "edit";
   const kindMismatch = !!inspection?.manifest && mode.type !== "new" && inspection.manifest.kind !== mode.kind;
   const packageOk = pkg ? !!inspection?.ok && !kindMismatch : !needsPackage;
-  const canSubmit = !!session && packageOk && fields.rights && fields.title.trim().length >= 2 && !!(fields.summaryDe.trim() || fields.summaryEn.trim()) && status.kind !== "sending" && !checking;
+  const canSubmit = !!session && packageOk && fields.rights && fields.titleEn.trim().length >= 2 && fields.titleDe.trim().length !== 1 && !!(fields.summaryDe.trim() || fields.summaryEn.trim()) && status.kind !== "sending" && !checking;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -178,16 +186,19 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
     const text =
       {
         package_invalid: t("Das Paket hat die Prüfung nicht bestanden.", "The package did not pass the checks."),
-        invalid_form: t("Bitte prüfe die markierten Felder.", "Please check the highlighted fields."),
+        invalid_form: data.fields?.includes("titleEn")
+          ? t("Bitte gib einen englischen Titel an – jede neue Vorlage und jede neue Version braucht ihn.", "Please enter an English title – every new template and every new version needs one.")
+          : t("Bitte prüfe die markierten Felder.", "Please check the highlighted fields."),
         pending_version: t("Eine Version dieser Vorlage wartet noch auf Prüfung.", "A version of this template is still waiting for review."),
         kind_mismatch: t("Eine neue Version muss dieselbe Art haben.", "A new version must be of the same kind."),
         rate_limited: t("Heute schon viele Einreichungen – bitte morgen weiter.", "Lots of submissions today already – please continue tomorrow."),
         signed_out: t("Du bist nicht mehr angemeldet.", "You are no longer signed in."),
         too_large: t("Das Paket ist größer als 25 MB.", "The package is larger than 25 MB."),
       }[data.error ?? ""] ?? t("Das hat nicht geklappt. Versuch es noch einmal.", "That didn't work. Please try again.");
-    setStatus({ kind: "error", text, findings: data.findings });
+    setStatus({ kind: "error", text, findings: data.findings, fields: data.fields });
   }
 
+  const invalid = (field: string) => status.kind === "error" && !!status.fields?.includes(field);
   const findings = inspection?.findings ?? [];
   const order = { error: 0, warning: 1, info: 2 };
   const heading =
@@ -309,9 +320,16 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
           </h2>
           <p className="muted">{t(`Angemeldet als ${session.name}. Dein Name steht an der Vorlage.`, `Signed in as ${session.name}. Your name is shown on the template.`)}</p>
           <div className="fields">
-            <label className="field wide">
-              <span>{t("Titel", "Title")}</span>
-              <input value={fields.title} onChange={(e) => set("title", e.target.value)} maxLength={LIMITS.title} required minLength={2} />
+            <label className="field">
+              <span>{t("Titel (Deutsch, optional)", "Title (German, optional)")}</span>
+              <input value={fields.titleDe} onChange={(e) => set("titleDe", e.target.value)} maxLength={LIMITS.title} minLength={2} lang="de" aria-invalid={invalid("titleDe") || undefined} />
+            </label>
+            <label className="field">
+              <span>{t("Titel (Englisch)", "Title (English)")}</span>
+              <input value={fields.titleEn} onChange={(e) => set("titleEn", e.target.value)} maxLength={LIMITS.title} required minLength={2} lang="en" aria-invalid={invalid("titleEn") || undefined} aria-describedby="title-en-hint" />
+              <small id="title-en-hint" className="field-hint">
+                {t("Pflicht: Englische Seiten zeigen ihn, deutsche den deutschen Titel, wenn es einen gibt.", "Required: English pages show it, German pages the German title if there is one.")}
+              </small>
             </label>
             <label className="field">
               <span>{t("Kurzbeschreibung (Deutsch)", "Summary (German)")}</span>

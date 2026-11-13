@@ -9,6 +9,9 @@ import type { Kind } from "./catalog";
 export type PackageSpec = {
   kind: Kind;
   title: string;
+  // template.json `titles`; default: the title as the English one (what a
+  // current Flowplan always writes). null leaves it out (an older Flowplan).
+  titles?: { de?: string; en?: string } | null;
   summary: { de?: string; en?: string };
   description?: { de?: string; en?: string };
   category: string;
@@ -27,6 +30,7 @@ export function buildSamplePackage(spec: PackageSpec): Buffer {
     format: PACKAGE_FORMAT,
     kind: spec.kind,
     title: spec.title,
+    ...(spec.titles === null ? {} : { titles: spec.titles ?? { en: spec.title } }),
     summary: spec.summary,
     ...(spec.description ? { description: spec.description } : {}),
     category: spec.category,

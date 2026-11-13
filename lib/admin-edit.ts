@@ -13,7 +13,8 @@
 //                        changes_requested; everything changes that version
 //                        in place, the status stays.
 //
-// Validation is the submit form's (lib/store.ts parseSubmissionForm), the
+// Validation is the submit form's (lib/store.ts parseSubmissionForm; an
+// English title once set stays required), the
 // package checks are inspectPackage()'s. The licence is the author's choice
 // and can't be changed here. On official templates the changed metadata is
 // remembered in templates.admin_overrides, so the next seed (lib/official.ts)
@@ -241,10 +242,17 @@ export async function adminEdit(scope: EditScope, id: string, body: Record<strin
       if (typeof body[key] !== "string") throw bad(`${key} must be text.`, [key]);
       input[key] = body[key];
     }
-  // A changed `title` without `titles` is the title in every language: the
-  // per-language titles go, or English pages would keep showing the old one.
-  if (typeof body.title === "string" && body.title.trim() !== before.title && !("titles" in body)) input.titleDe = input.titleEn = "";
+  // A changed `title` without `titles` is the title in every language: it
+  // becomes the English title and the German one goes (German pages fall
+  // back to the English one), or English pages would keep showing the old one.
+  if (typeof body.title === "string" && body.title.trim() !== before.title && !("titles" in body)) {
+    input.titleDe = "";
+    input.titleEn = body.title;
+  }
   readLocalized(body, "titles", input);
+  // The English title can be changed, not removed (templates from before the
+  // rule may still have none; an admin can add one).
+  if (before.titleEn.trim() && !String(input.titleEn ?? "").trim()) throw bad("The English title can't be removed.", ["titles.en"]);
   readLocalized(body, "summary", input);
   readLocalized(body, "description", input);
   if ("tags" in body) {

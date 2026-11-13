@@ -1,21 +1,12 @@
 import Link from "next/link";
-import { pageT } from "@/lib/page";
-import { headers } from "next/headers";
+import { pageBack, pageT } from "@/lib/page";
 import { legalUrl } from "@/lib/legal";
+import { switchLanguageHref, type Locale } from "@/lib/i18n";
 
 export async function SiteFooter() {
-  const { t, locale } = await pageT();
-  const h = await headers();
+  const [{ t, locale }, back] = await Promise.all([pageT(), pageBack()]);
   // Back to the page the visitor is on after switching the language.
-  const back = (() => {
-    try {
-      const url = new URL(h.get("x-url") || h.get("referer") || "/", "http://x");
-      return url.pathname + url.search;
-    } catch {
-      return "/";
-    }
-  })();
-  const switchTo = (l: "de" | "en") => `/lang/${l}?next=${encodeURIComponent(back)}`;
+  const switchTo = (l: Locale) => switchLanguageHref(l, back);
   return (
     <footer className="site-footer">
       <div className="footer-inner">

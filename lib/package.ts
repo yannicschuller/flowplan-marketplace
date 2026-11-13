@@ -215,6 +215,30 @@ export async function inspectPackage(input: Uint8Array): Promise<Inspection> {
   return result;
 }
 
+// What an author submits must carry its English title (template.json
+// `titles.en`): every template has one, so English pages never show a
+// title the visitor may not read. Flowplan's publish dialog asks for it; a
+// package without it comes from an older Flowplan (or was made by hand).
+// Only for submissions – the official seed and an admin's package
+// replacement keep their own metadata, and stored templates without
+// `titles` keep working.
+export const englishTitleFinding = (manifest: Manifest | null): Finding | null =>
+  !manifest || manifest.titles?.en?.trim()
+    ? null
+    : finding(
+        "error",
+        "title-en-missing",
+        "Im Paket fehlt der englische Titel – es kommt wohl von einer älteren Flowplan-Version. Aktualisiere Flowplan und veröffentliche die Vorlage dort noch einmal mit „Im Marketplace veröffentlichen …“: Dort gibst du den englischen Titel an.",
+        'The package has no English title – it probably comes from an older Flowplan version. Update Flowplan and publish the template from there again with "Publish to the marketplace …", where you enter the English title.',
+        "titles.en",
+      );
+export function forSubmission(inspection: Inspection): Inspection {
+  const missing = englishTitleFinding(inspection.manifest);
+  if (!missing) return inspection;
+  const findings = [...inspection.findings, missing];
+  return { ...inspection, findings, ok: false };
+}
+
 // ---- Kind payloads ----
 
 const NESTED_LIMITS = { maxEntries: 202, maxEntryBytes: 25 * 1024 * 1024, maxTotalBytes: 60 * 1024 * 1024, maxRatio: 100 };

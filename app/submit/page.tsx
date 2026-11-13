@@ -9,7 +9,10 @@ import { SubmitForm, type Fields, type SubmitMode } from "@/components/submit-fo
 export const metadata: Metadata = { title: "Einreichen / Submit", robots: { index: false } };
 
 const fieldsOf = (v: VersionRow): Fields => ({
-  title: v.title,
+  // Stored titles only: a template from before the English title was
+  // required starts without one, the author adds it.
+  titleDe: v.title_de,
+  titleEn: v.title_en,
   summaryDe: v.summary_de,
   summaryEn: v.summary_en,
   descriptionDe: v.description_de,

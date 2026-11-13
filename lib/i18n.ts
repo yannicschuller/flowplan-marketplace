@@ -4,7 +4,7 @@ export type Locale = "de" | "en";
 export const LOCALE_COOKIE = "mp_lang";
 export const isLocale = (v: unknown): v is Locale => v === "de" || v === "en";
 
-// The visitor's choice (footer switch) wins, else the browser's languages in order.
+// The visitor's choice (header or footer switch) wins, else the browser's languages in order.
 export function pickLocale(cookie: string | undefined | null, acceptLanguage: string | null | undefined): Locale {
   if (isLocale(cookie)) return cookie;
   const ranked = (acceptLanguage || "")
@@ -19,6 +19,19 @@ export function pickLocale(cookie: string | undefined | null, acceptLanguage: st
   for (const { lang } of ranked) if (isLocale(lang)) return lang;
   return "en";
 }
+// The language switches (header and footer): /lang/<locale> remembers the
+// choice in the language cookie and goes back to `back` (path and query of
+// the page the visitor is on, from the proxy's x-url header or the referer).
+export function backPath(url: string | null | undefined) {
+  try {
+    const u = new URL(url || "/", "http://x");
+    return u.pathname + u.search;
+  } catch {
+    return "/";
+  }
+}
+export const switchLanguageHref = (locale: Locale, back: string) => `/lang/${locale}?next=${encodeURIComponent(back)}`;
+
 export type T = (de: string, en: string) => string;
 export const translate = (locale: Locale): T => (de, en) => (locale === "de" ? de : en);
 

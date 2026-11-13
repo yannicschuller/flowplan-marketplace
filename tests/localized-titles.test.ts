@@ -15,7 +15,7 @@ useTempData();
 import { seedOfficial } from "../lib/official";
 import { adminRoute } from "../lib/admin";
 import { handle } from "../lib/http";
-import { migrate, one, SCHEMA_VERSION } from "../lib/db";
+import { migrate, one, run, SCHEMA_VERSION } from "../lib/db";
 import { readPackage } from "../lib/storage";
 import { readZip } from "../lib/zip";
 import { inspectPackage } from "../lib/package";
@@ -91,14 +91,15 @@ test("official: card, page, API, search and sorting in the visitor's language", 
   assert.deepEqual(templateDetail(row).titles, { de: "Statuswechsel melden", en: "Notify on status change" });
 });
 
-test("community templates without `titles`: the one title in both languages", async () => {
+test("community templates without `titles` (from before the English title was required): the one title in both languages", async () => {
   const a = author("Titelautorin");
   const sent = await submitVia(a, docPackage(), { title: "Projektplan" });
   assert.equal(sent.status, 201, JSON.stringify(sent.data));
+  // As a version stored before the English title was required holds it.
+  run("UPDATE versions SET title_de='', title_en='' WHERE id=?", sent.data.versionId);
   const v = one<any>("SELECT * FROM versions WHERE id=?", sent.data.versionId);
-  assert.equal(v.title_de, "");
-  assert.equal(v.title_en, "");
   assert.equal(localTitle("en", v), "Projektplan");
+  assert.equal(localTitle("de", v), "Projektplan");
 });
 
 test("admin edits: `titles` sets them, a new `title` alone replaces them, the seed keeps both", async () => {
@@ -116,7 +117,9 @@ test("admin edits: `titles` sets them, a new `title` alone replaces them, the se
   assert.equal(r.status, 200, JSON.stringify(r.data));
   let row = publicTemplate("workflow-status-change-notify")!;
   assert.equal(card(row, "en"), "Status melden");
-  assert.equal((await storedManifest("workflow-status-change-notify")).titles, undefined);
+  // It becomes the English title; German pages fall back to it.
+  assert.deepEqual((await storedManifest("workflow-status-change-notify")).titles, { en: "Status melden" });
+  assert.equal(card(row, "de"), "Status melden");
   writeFileSync(join(seedDir, "workflow-status-change-notify.flowplan-template"), wf("Statuswechsel melden", { de: "Statuswechsel melden", en: "Notify on a status change" }));
   assert.deepEqual((await seedOfficial({ dir: seedDir, log: quiet })).map((o) => o.result).sort(), ["unchanged", "updated"]);
   row = publicTemplate("workflow-status-change-notify")!;
