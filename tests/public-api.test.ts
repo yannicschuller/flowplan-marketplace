@@ -14,6 +14,7 @@ const list = async (query: string) => {
   return { status: r.status, cors: r.headers.get("access-control-allow-origin"), data: (await r.json()) as any };
 };
 const slugs: Record<string, string> = {};
+const BROWSER = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 
 before(async () => {
   const a = author("Public Autorin");
@@ -66,9 +67,12 @@ test("detail, download with counting, previews, versions", async () => {
   assert.equal(d.headers.get("content-type"), "application/zip");
   assert.equal(d.headers.get("x-template-sha256"), t.sha256);
   assert.match(d.headers.get("content-disposition")!, /attachment; filename=".+-v1\.flowplan-template"/);
-  // The same visitor within a minute counts once; "open" counts separately.
-  await downloadRoute(req(`/api/templates/${slugs[0]}/download`, { headers: { "x-forwarded-for": "192.0.2.10" } }), slugs[0]);
-  await downloadRoute(req(`/api/templates/${slugs[0]}/download?via=open`, { headers: { "x-forwarded-for": "192.0.2.10" } }), slugs[0]);
+  // A person's click counts once a day; "open" counts separately. The
+  // request above had no user agent and did not count.
+  const click = { "x-forwarded-for": "192.0.2.10", "user-agent": BROWSER, "sec-fetch-mode": "navigate", "sec-fetch-user": "?1", "sec-fetch-site": "same-origin" };
+  await downloadRoute(req(`/api/templates/${slugs[0]}/download`, { headers: click }), slugs[0]);
+  await downloadRoute(req(`/api/templates/${slugs[0]}/download`, { headers: click }), slugs[0]);
+  await downloadRoute(req(`/api/templates/${slugs[0]}/download?via=open`, { headers: { "x-forwarded-for": "192.0.2.10", "user-agent": BROWSER, "sec-fetch-mode": "cors", "sec-fetch-site": "same-origin" } }), slugs[0]);
   const counts = one<{ downloads: number; opens: number }>("SELECT downloads, opens FROM templates WHERE slug=?", slugs[0])!;
   assert.deepEqual({ ...counts }, { downloads: 1, opens: 1 });
   assert.equal((await handle(() => downloadRoute(req(`/api/templates/${slugs[0]}/download?version=2`), slugs[0]))).status, 404);

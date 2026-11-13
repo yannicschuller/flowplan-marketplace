@@ -92,7 +92,7 @@ export default async function TemplatePage({ params }: Props) {
             }}
             defaultInstance={config.defaultInstance()}
           />
-          <a className="button" href={`/api/templates/${row.slug}/download`} download>
+          <a className="button" href={`/api/templates/${row.slug}/download`} download rel="nofollow">
             <DownloadSimple size={16} aria-hidden="true" />
             {t("Herunterladen", "Download")}
             <span className="muted">{formatBytes(row.size)}</span>
@@ -186,7 +186,7 @@ export default async function TemplatePage({ params }: Props) {
                       <span className="muted"> · {formatDate(locale, v.published_at ?? v.submitted_at)} · Flowplan ≥ {v.min_version}</span>
                       {v.changelog && <p>{v.changelog}</p>}
                     </div>
-                    <a href={`/api/templates/${row.slug}/download?version=${v.number}`} download>
+                    <a href={`/api/templates/${row.slug}/download?version=${v.number}`} download rel="nofollow">
                       {t("Herunterladen", "Download")}
                     </a>
                   </li>

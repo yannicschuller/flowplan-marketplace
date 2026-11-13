@@ -9,6 +9,7 @@ import { createReport } from "./reports";
 import { hit, ipKey } from "./rate-limit";
 import { inspectPackage, LIMITS } from "./package";
 import { viewerFromEntries } from "./workflow-viewer";
+import { countable, firstToday } from "./download-count";
 import { LOCALE_COOKIE, pickLocale } from "./i18n";
 import {
   GITHUB_STATE_COOKIE,
@@ -92,11 +93,11 @@ export function downloadRoute(request: Request, slug: string) {
   }
   const bytes = readPackage(found.version.id);
   const via = p.get("via") === "open" ? "open" : "download";
-  // A HEAD or a repeated request from the same visitor within a minute does not count twice.
+  // Counted: a GET by a person (no crawler or link preview), once per
+  // visitor, version and day (lib/download-count.ts).
   if (request.method === "GET") {
     try {
-      hit(`count:${via}:${ipKey(clientIp(request))}:${found.version.id}`, 1, 60);
-      countDownload(found.template.t_id, found.version.id, via);
+      if (countable(request, via) && firstToday(request, via, found.version.id)) countDownload(found.template.t_id, found.version.id, via);
     } catch {}
   }
   return new Response(request.method === "HEAD" ? null : new Uint8Array(bytes), {

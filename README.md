@@ -104,7 +104,7 @@ CORS `*` for GET. Published templates only.
 |---|---|
 | `GET /api/templates?kind=&category=&q=&lang=&sort=newest\|popular\|updated\|title\|featured&limit=&offset=&author=&official=1` | list (`{templates, total}`); each template has `official: true\|false` |
 | `GET /api/templates/:slug` | detail with description, versions, analysis |
-| `GET /api/templates/:slug/download[?version=N]` | the package (`X-Template-Sha256`, `X-Template-Version`) |
+| `GET /api/templates/:slug/download[?version=N]` | the package (`X-Template-Sha256`, `X-Template-Version`); counts a download for a person's click (`?via=open` an opening from the template page), once per visitor, version and day – crawlers, link previews and scripts (by user agent and Fetch Metadata) don't count (`lib/download-count.ts`); `/robots.txt` keeps crawlers out of `/api/` |
 | `GET /api/templates/:slug/previews/:n[?version=N]` | preview image |
 
 ## Admin API
