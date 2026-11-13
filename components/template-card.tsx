@@ -2,7 +2,7 @@ import Link from "next/link";
 import { KindIcon } from "./kind-icon";
 import { OfficialBadge } from "./official-badge";
 import { kindLabel } from "@/lib/catalog";
-import { localized, type Locale, translate } from "@/lib/i18n";
+import { localTitle, localized, type Locale, translate } from "@/lib/i18n";
 import { parseJsonColumn, type PreviewInfo, type PublicRow } from "@/lib/store";
 import { DownloadSimple } from "@phosphor-icons/react/dist/ssr/DownloadSimple";
 
@@ -34,7 +34,7 @@ export function TemplateCard({ row, locale }: { row: PublicRow; locale: Locale }
             </span>
             {!!row.official && <OfficialBadge t={t} />}
           </span>
-          <h3>{row.title}</h3>
+          <h3>{localTitle(locale, row)}</h3>
           <p>{localized(locale, { de: row.summary_de, en: row.summary_en })}</p>
           <div className="card-meta">
             <span>{row.author_name}</span>

@@ -127,6 +127,16 @@ const MIGRATIONS: string[] = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX slug_redirects_template ON slug_redirects(template_id);`,
+  // 6: the title per interface language (template.json `titles`, #276) –
+  // filled from the stored template.json where it already has them. Official
+  // templates get them with their next seed: the files in seed/official
+  // carry them, so each one becomes a new published version on that start.
+  `ALTER TABLE versions ADD COLUMN title_de TEXT NOT NULL DEFAULT '';
+   ALTER TABLE versions ADD COLUMN title_en TEXT NOT NULL DEFAULT '';
+   UPDATE versions SET
+     title_de = COALESCE(TRIM(json_extract(manifest, '$.titles.de')), ''),
+     title_en = COALESCE(TRIM(json_extract(manifest, '$.titles.en')), '')
+   WHERE json_valid(manifest) AND json_type(manifest, '$.titles') = 'object';`,
 ];
 export const SCHEMA_VERSION = MIGRATIONS.length;
 

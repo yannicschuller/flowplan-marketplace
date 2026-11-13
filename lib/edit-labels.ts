@@ -7,6 +7,8 @@ export type AdminEdit = { at: number; by: string; fields: string[]; message?: st
 // Field names for the author's e-mail and /me.
 export const FIELD_LABELS: Record<string, [string, string]> = {
   title: ["Titel", "title"],
+  "title.de": ["Titel (Deutsch)", "title (German)"],
+  "title.en": ["Titel (Englisch)", "title (English)"],
   "summary.de": ["Kurzbeschreibung (Deutsch)", "summary (German)"],
   "summary.en": ["Kurzbeschreibung (Englisch)", "summary (English)"],
   "description.de": ["Beschreibung (Deutsch)", "description (German)"],

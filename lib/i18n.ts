@@ -26,6 +26,11 @@ export const translate = (locale: Locale): T => (de, en) => (locale === "de" ? d
 export const localized = (locale: Locale, value: { de?: string; en?: string }) =>
   (locale === "de" ? value.de || value.en : value.en || value.de) || "";
 
+// A template's title in the visitor's language: the per-language title
+// (template.json `titles`, official templates), else its own title.
+export const localTitle = (locale: Locale, row: { title: string; title_de?: string | null; title_en?: string | null }) =>
+  localized(locale, { de: row.title_de ?? "", en: row.title_en ?? "" }) || row.title;
+
 export function formatDate(locale: Locale, at: number) {
   return new Intl.DateTimeFormat(locale === "de" ? "de-DE" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(at);
 }

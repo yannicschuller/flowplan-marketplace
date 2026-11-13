@@ -69,6 +69,8 @@ function formOf(inspection: Inspection) {
   const license = typeof raw.license === "string" && (LICENSES as readonly string[]).includes(raw.license) ? raw.license : OFFICIAL_DEFAULT_LICENSE;
   return parseSubmissionForm({
     title: m.title,
+    titleDe: m.titles?.de ?? "",
+    titleEn: m.titles?.en ?? "",
     summaryDe: m.summary.de ?? "",
     summaryEn: m.summary.en ?? "",
     descriptionDe: m.description?.de ?? "",
@@ -87,6 +89,8 @@ function formOf(inspection: Inspection) {
 // metadata; "previews": the current version's previews instead of the file's.
 const OVERRIDE_FIELDS: Record<string, keyof SubmissionForm> = {
   title: "title",
+  "title.de": "titleDe",
+  "title.en": "titleEn",
   "summary.de": "summaryDe",
   "summary.en": "summaryEn",
   "description.de": "descriptionDe",

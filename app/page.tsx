@@ -30,7 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     return s ? `/?${s}#browse` : "/#browse";
   };
 
-  const results = filtering ? publicTemplates({ q, kind, category, sort, official: !!official, limit: 60 }) : null;
+  const results = filtering ? publicTemplates({ q, kind, category, sort, official: !!official, limit: 60, locale }) : null;
   const featured = filtering ? null : publicTemplates({ featured: true, limit: 6 }).rows;
   const newest = filtering ? null : publicTemplates({ sort: "newest", limit: 6 }).rows;
   const popular = filtering ? null : publicTemplates({ sort: "popular", limit: 6 }).rows;

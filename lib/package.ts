@@ -36,6 +36,8 @@ export const manifestSchema = z.object({
   format: z.literal(PACKAGE_FORMAT),
   kind: z.enum(KINDS),
   title: z.string().trim().min(1).max(LIMITS.title),
+  // The title per interface language (optional); `title` is the fallback.
+  titles: localized(LIMITS.title).optional(),
   summary: localized(LIMITS.summary).refine((s) => !!(s.de?.trim() || s.en?.trim()), "summary needs de or en"),
   description: localized(LIMITS.description).optional(),
   category: z.enum(CATEGORIES),
@@ -435,6 +437,7 @@ export function analyzeWorkflow(nodes: unknown[], whole: unknown): WorkflowAnaly
 
 export type StoredMeta = {
   title: string;
+  titles?: { de: string; en: string };
   summary: { de: string; en: string };
   description: { de: string; en: string };
   category: string;
@@ -455,6 +458,7 @@ export function buildPackage(inspection: Inspection, meta: StoredMeta): Buffer {
     format: PACKAGE_FORMAT,
     kind: m.kind,
     title: meta.title,
+    ...(meta.titles && (meta.titles.de.trim() || meta.titles.en.trim()) ? { titles: drop(meta.titles) } : {}),
     summary: drop(meta.summary),
     ...(meta.description.de.trim() || meta.description.en.trim() ? { description: drop(meta.description) } : {}),
     category: meta.category,
