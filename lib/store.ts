@@ -12,6 +12,7 @@ import { PENDING, transition, type Status } from "./status";
 import { hit } from "./rate-limit";
 import { config } from "./config";
 import type { ImageType } from "./images";
+import { localTitle, type Locale } from "./i18n";
 
 export type TemplateRow = {
   id: string;
@@ -38,7 +39,11 @@ export type VersionRow = {
   template_id: string;
   number: number;
   status: Status;
+  // `title` is the template's own; title_de/title_en the title per interface
+  // language when the package brings them (official templates), else ''.
   title: string;
+  title_de: string;
+  title_en: string;
   summary_de: string;
   summary_en: string;
   description_de: string;
@@ -71,6 +76,9 @@ export type PreviewInfo = { n: number; type: ImageType };
 const text = (max: number) => z.string().trim().max(max).default("");
 export const submissionFormSchema = z.object({
   title: z.string().trim().min(2).max(LIMITS.title),
+  // Optional: the title in German and English (template.json `titles`).
+  titleDe: text(LIMITS.title),
+  titleEn: text(LIMITS.title),
   summaryDe: text(LIMITS.summary),
   summaryEn: text(LIMITS.summary),
   descriptionDe: text(LIMITS.description),
@@ -124,6 +132,7 @@ const templateUrl = (slug: string) => `${config.publicUrl()}/t/${slug}`;
 export function store(version: { id: string; number: number }, template: { id: string; slug: string }, user: User, inspection: Inspection, form: SubmissionForm) {
   const bytes = buildPackage(inspection, {
     title: form.title,
+    titles: { de: form.titleDe, en: form.titleEn },
     summary: { de: form.summaryDe, en: form.summaryEn },
     description: { de: form.descriptionDe, en: form.descriptionEn },
     category: form.category,
@@ -141,6 +150,8 @@ export function store(version: { id: string; number: number }, template: { id: s
 export const versionFields = (form: SubmissionForm, inspection: Inspection, bytes: Buffer) => {
   return {
     title: form.title,
+    title_de: form.titleDe,
+    title_en: form.titleEn,
     summary_de: form.summaryDe,
     summary_en: form.summaryEn,
     description_de: form.descriptionDe,
@@ -218,13 +229,15 @@ export async function submit(user: User, packageBytes: Uint8Array, formInput: un
 export function insertVersion(version: { id: string; number: number }, templateId: string, f: ReturnType<typeof versionFields>, status: "submitted" | "published", at: number) {
   const decided = status === "published" ? at : null;
   run(
-    `INSERT INTO versions(id,template_id,number,status,title,summary_de,summary_en,description_de,description_en,category,tags,min_version,language,license,changelog,manifest,findings,analysis,previews,size,sha256,submitted_at,updated_at,decided_at,published_at)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO versions(id,template_id,number,status,title,title_de,title_en,summary_de,summary_en,description_de,description_en,category,tags,min_version,language,license,changelog,manifest,findings,analysis,previews,size,sha256,submitted_at,updated_at,decided_at,published_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     version.id,
     templateId,
     version.number,
     status,
     f.title,
+    f.title_de,
+    f.title_en,
     f.summary_de,
     f.summary_en,
     f.description_de,
@@ -265,9 +278,11 @@ export async function editSubmission(user: User, versionId: string, packageBytes
   const bytes = store(version, template, user, inspection, form);
   const f = versionFields(form, inspection, bytes);
   run(
-    `UPDATE versions SET status=?,title=?,summary_de=?,summary_en=?,description_de=?,description_en=?,category=?,tags=?,min_version=?,language=?,license=?,changelog=?,manifest=?,findings=?,analysis=?,previews=?,size=?,sha256=?,updated_at=?,submitted_at=? WHERE id=?`,
+    `UPDATE versions SET status=?,title=?,title_de=?,title_en=?,summary_de=?,summary_en=?,description_de=?,description_en=?,category=?,tags=?,min_version=?,language=?,license=?,changelog=?,manifest=?,findings=?,analysis=?,previews=?,size=?,sha256=?,updated_at=?,submitted_at=? WHERE id=?`,
     next,
     f.title,
+    f.title_de,
+    f.title_en,
     f.summary_de,
     f.summary_en,
     f.description_de,
@@ -329,7 +344,8 @@ export function mySubmissions(user: User) {
 
 // ---- What everybody sees ----
 
-export type PublicFilters = { kind?: string; category?: string; q?: string; lang?: string; sort?: string; author?: string; limit?: number; offset?: number; featured?: boolean; official?: boolean };
+// `locale`: the visitor's interface language – sorting by title uses the title they see.
+export type PublicFilters = { kind?: string; category?: string; q?: string; lang?: string; sort?: string; author?: string; limit?: number; offset?: number; featured?: boolean; official?: boolean; locale?: Locale };
 const PUBLIC_JOIN = `FROM templates t JOIN versions v ON v.id=t.published_version_id JOIN users u ON u.id=t.author_id
   WHERE t.unpublished_at IS NULL AND t.withdrawn_at IS NULL AND v.status='published'`;
 export type PublicRow = VersionRow & {
@@ -347,6 +363,15 @@ export type PublicRow = VersionRow & {
   official: number;
 };
 const PUBLIC_SELECT = `SELECT v.*, t.id AS t_id, t.slug, t.kind, t.published_at AS t_published_at, t.updated_at AS t_updated_at, t.downloads AS t_downloads, t.opens, t.featured_rank, u.name AS author_name, u.handle AS author_handle, u.system AS official ${PUBLIC_JOIN}`;
+
+// The title a visitor sees (lib/i18n.ts localTitle), in SQL; without a
+// locale (the public API) the template's own title.
+const titleSql = (locale?: Locale) =>
+  !locale
+    ? "v.title"
+    : locale === "de"
+      ? "COALESCE(NULLIF(v.title_de,''),NULLIF(v.title_en,''),v.title)"
+      : "COALESCE(NULLIF(v.title_en,''),NULLIF(v.title_de,''),v.title)";
 
 export function publicTemplates(filters: PublicFilters = {}) {
   const where: string[] = [];
@@ -373,8 +398,10 @@ export function publicTemplates(filters: PublicFilters = {}) {
   if (q)
     for (const word of q.split(/\s+/).slice(0, 5)) {
       const like = `%${word.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-      where.push("(v.title LIKE ? ESCAPE '\\' OR v.summary_de LIKE ? ESCAPE '\\' OR v.summary_en LIKE ? ESCAPE '\\' OR v.tags LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\')");
-      params.push(like, like, like, like, like);
+      where.push(
+        "(v.title LIKE ? ESCAPE '\\' OR v.title_de LIKE ? ESCAPE '\\' OR v.title_en LIKE ? ESCAPE '\\' OR v.summary_de LIKE ? ESCAPE '\\' OR v.summary_en LIKE ? ESCAPE '\\' OR v.tags LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\')",
+      );
+      params.push(like, like, like, like, like, like, like);
     }
   const order =
     filters.featured
@@ -382,7 +409,7 @@ export function publicTemplates(filters: PublicFilters = {}) {
       : ({
           popular: "(t.downloads + t.opens) DESC, t.published_at DESC",
           updated: "v.published_at DESC",
-          title: "v.title COLLATE NOCASE ASC",
+          title: `${titleSql(filters.locale)} COLLATE NOCASE ASC`,
           newest: "t.published_at DESC",
         } as Record<string, string>)[filters.sort || "newest"] ?? "t.published_at DESC";
   const extra = where.length ? ` AND ${where.join(" AND ")}` : "";
@@ -443,6 +470,8 @@ export function templateSummary(row: PublicRow) {
     url: templateUrl(row.slug),
     kind: row.kind,
     title: row.title,
+    // The title per interface language; a missing one falls back to `title`.
+    titles: { de: localTitle("de", row), en: localTitle("en", row) },
     summary: { de: row.summary_de, en: row.summary_en },
     category: row.category,
     tags: parseJsonColumn<string[]>(row.tags, []),

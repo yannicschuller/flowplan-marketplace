@@ -5,7 +5,7 @@ import { pageT } from "@/lib/page";
 import { config } from "@/lib/config";
 import { movedSlug, parseJsonColumn, publicTemplate, publishedVersions, type PreviewInfo } from "@/lib/store";
 import { LICENSE_URLS, categoryLabel, kindLabel, languageLabel, licenseLabel, type License } from "@/lib/catalog";
-import { formatBytes, formatDate, localized } from "@/lib/i18n";
+import { formatBytes, formatDate, localTitle, localized } from "@/lib/i18n";
 import type { Analysis } from "@/lib/package";
 import { Markdown } from "@/components/markdown";
 import { KindIcon } from "@/components/kind-icon";
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await pageT();
   const row = publicTemplate((await params).slug);
   if (!row) return {};
-  return { title: row.title, description: localized(locale, { de: row.summary_de, en: row.summary_en }) };
+  return { title: localTitle(locale, row), description: localized(locale, { de: row.summary_de, en: row.summary_en }) };
 }
 
 export default async function TemplatePage({ params }: Props) {
@@ -42,6 +42,7 @@ export default async function TemplatePage({ params }: Props) {
     if (to) permanentRedirect(`/t/${encodeURIComponent(to)}`);
     notFound();
   }
+  const title = localTitle(locale, row);
   const previews = parseJsonColumn<PreviewInfo[]>(row.previews, []);
   const tags = parseJsonColumn<string[]>(row.tags, []);
   const analysis = parseJsonColumn<Analysis>(row.analysis, {});
@@ -67,7 +68,7 @@ export default async function TemplatePage({ params }: Props) {
             </span>
             {!!row.official && <OfficialBadge t={t} />}
           </span>
-          <h1>{row.title}</h1>
+          <h1>{title}</h1>
           <p className="lede">{localized(locale, { de: row.summary_de, en: row.summary_en })}</p>
           <p className="byline">
             {t("von", "by")} <Link href={`/u/${row.author_handle}`}>{row.author_name}</Link>
@@ -85,7 +86,7 @@ export default async function TemplatePage({ params }: Props) {
               version: row.number,
               minVersion: row.min_version,
               sha256: row.sha256,
-              title: row.title,
+              title,
               kind: row.kind,
               author: row.author_name,
               license: row.license,
@@ -107,7 +108,7 @@ export default async function TemplatePage({ params }: Props) {
         <div className={`gallery count-${previews.length}`}>
           {previews.map((p, i) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={p.n} src={previewSrc(row.slug, row, p.n)} alt={t(`Vorschau ${i + 1} von „${row.title}“`, `Preview ${i + 1} of "${row.title}"`)} width={960} height={600} />
+            <img key={p.n} src={previewSrc(row.slug, row, p.n)} alt={t(`Vorschau ${i + 1} von „${title}“`, `Preview ${i + 1} of "${title}"`)} width={960} height={600} />
           ))}
         </div>
       )}

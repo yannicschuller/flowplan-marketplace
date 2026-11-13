@@ -40,6 +40,8 @@ import type { AdminEdit } from "./edit-labels";
 // The editable metadata: API name → submit form field.
 const META = {
   title: "title",
+  "title.de": "titleDe",
+  "title.en": "titleEn",
   "summary.de": "summaryDe",
   "summary.en": "summaryEn",
   "description.de": "descriptionDe",
@@ -84,6 +86,8 @@ function requireTarget(scope: EditScope, id: string): Target {
 
 const formOf = (v: VersionRow): SubmissionForm => ({
   title: v.title,
+  titleDe: v.title_de,
+  titleEn: v.title_en,
   summaryDe: v.summary_de,
   summaryEn: v.summary_en,
   descriptionDe: v.description_de,
@@ -113,6 +117,7 @@ async function rebuild(t: Target, base: Inspection, form: SubmissionForm, slug: 
     { ...base, previews },
     {
       title: form.title,
+      titles: { de: form.titleDe, en: form.titleEn },
       summary: { de: form.summaryDe, en: form.summaryEn },
       description: { de: form.descriptionDe, en: form.descriptionEn },
       category: form.category,
@@ -138,8 +143,10 @@ function saveInPlace(t: Target, form: SubmissionForm, check: Inspection, bytes: 
   const edits = [...parseJsonColumn<AdminEdit[]>(t.version.admin_edits, []), edit];
   transaction(() => {
     run(
-      `UPDATE versions SET title=?,summary_de=?,summary_en=?,description_de=?,description_en=?,category=?,tags=?,min_version=?,language=?,manifest=?,findings=?,analysis=?,previews=?,size=?,sha256=?,admin_edits=?,updated_at=? WHERE id=?`,
+      `UPDATE versions SET title=?,title_de=?,title_en=?,summary_de=?,summary_en=?,description_de=?,description_en=?,category=?,tags=?,min_version=?,language=?,manifest=?,findings=?,analysis=?,previews=?,size=?,sha256=?,admin_edits=?,updated_at=? WHERE id=?`,
       f.title,
+      f.title_de,
+      f.title_en,
       f.summary_de,
       f.summary_en,
       f.description_de,
@@ -204,17 +211,19 @@ const auditBase = (t: Target) => ({ scope: t.scope, template: t.template.id, slu
 
 // ---- PATCH: metadata and slug ----
 
-const ALLOWED = new Set(["title", "summary", "description", "category", "tags", "language", "minVersion", "slug", "notify", "message", "also"]);
+const ALLOWED = new Set(["title", "titles", "summary", "description", "category", "tags", "language", "minVersion", "slug", "notify", "message", "also"]);
 const bad = (message: string, fields: string[]) => new HttpError(400, "invalid_form", message, { fields });
 
-function readLocalized(body: Record<string, unknown>, key: "summary" | "description", form: Record<string, unknown>) {
+// `titles` fills titleDe/titleEn, `summary` summaryDe/summaryEn, …
+const FORM_PREFIX = { titles: "title", summary: "summary", description: "description" } as const;
+function readLocalized(body: Record<string, unknown>, key: keyof typeof FORM_PREFIX, form: Record<string, unknown>) {
   if (!(key in body)) return;
   const v = body[key];
   if (!v || typeof v !== "object" || Array.isArray(v)) throw bad(`${key} must be {de, en}.`, [key]);
   for (const [lang, text] of Object.entries(v)) {
     if (lang !== "de" && lang !== "en") throw bad(`${key} has only de and en.`, [`${key}.${lang}`]);
     if (typeof text !== "string") throw bad(`${key}.${lang} must be text.`, [`${key}.${lang}`]);
-    form[`${key}${lang === "de" ? "De" : "En"}`] = text;
+    form[`${FORM_PREFIX[key]}${lang === "de" ? "De" : "En"}`] = text;
   }
 }
 
@@ -232,6 +241,10 @@ export async function adminEdit(scope: EditScope, id: string, body: Record<strin
       if (typeof body[key] !== "string") throw bad(`${key} must be text.`, [key]);
       input[key] = body[key];
     }
+  // A changed `title` without `titles` is the title in every language: the
+  // per-language titles go, or English pages would keep showing the old one.
+  if (typeof body.title === "string" && body.title.trim() !== before.title && !("titles" in body)) input.titleDe = input.titleEn = "";
+  readLocalized(body, "titles", input);
   readLocalized(body, "summary", input);
   readLocalized(body, "description", input);
   if ("tags" in body) {

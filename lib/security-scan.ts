@@ -351,6 +351,7 @@ function checkStrings(value: unknown, entry: string, f: Findings, opts: { html?:
 function checkManifest(m: Record<string, unknown>, f: Findings) {
   const visible: [string, unknown][] = [
     ["title", m.title],
+    ...(m.titles && typeof m.titles === "object" ? Object.entries(m.titles).map(([lang, v]) => [`titles/${lang}`, v] as [string, unknown]) : []),
     ["tags", Array.isArray(m.tags) ? m.tags.join(" ") : ""],
     ["summary", m.summary && typeof m.summary === "object" ? Object.values(m.summary).join(" ") : ""],
   ];
@@ -360,7 +361,7 @@ function checkManifest(m: Record<string, unknown>, f: Findings) {
     if (INVISIBLE.test(raw)) f.add("warn", "unicode-invisible", where, "Unsichtbare Zeichen (Zero-Width) im angezeigten Text.", "Invisible (zero-width) characters in the shown text.");
     const mixed = mixedScriptWords(raw);
     const share = confusableShare(raw);
-    if (field === "title" && (mixed || share > 0.15))
+    if ((field === "title" || field.startsWith("titles/")) && (mixed || share > 0.15))
       f.add("warn", "unicode-homoglyph", where, "Titel mischt lateinische mit kyrillischen/griechischen Buchstaben (Verwechslungsgefahr).", "Title mixes Latin with Cyrillic/Greek letters (look-alike characters).");
   }
   // marketplace {id, slug, version, url}: written by the marketplace itself.

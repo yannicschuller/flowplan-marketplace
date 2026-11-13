@@ -82,6 +82,7 @@ function submissionSummary(v: VersionWithTemplate) {
     status: v.status,
     kind: v.kind,
     title: v.title,
+    titles: { de: v.title_de, en: v.title_en },
     summary: { de: v.summary_de, en: v.summary_en },
     category: v.category,
     tags: parseJsonColumn<string[]>(v.tags, []),
@@ -120,6 +121,8 @@ function versionDiff(v: VersionRow, base: VersionRow | undefined) {
   if (!base || base.id === v.id) return null;
   const fields: [string, keyof VersionRow][] = [
     ["title", "title"],
+    ["title.de", "title_de"],
+    ["title.en", "title_en"],
     ["summary.de", "summary_de"],
     ["summary.en", "summary_en"],
     ["description.de", "description_de"],

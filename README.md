@@ -19,8 +19,8 @@ A Next.js 16 app (App Router, TypeScript strict) with one SQLite database (`node
 A `*.flowplan-template` file is a ZIP:
 
 ```
-template.json            format, kind, title, summary{de,en}, description{de,en}?, category,
-                         tags[≤10], minVersion, language, payload
+template.json            format, kind, title, titles{de,en}?, summary{de,en}, description{de,en}?,
+                         category, tags[≤10], minVersion, language, payload
 payload/…                the kind's own exchange format, unchanged
                          document/database: flowplan-template-1 ZIP · workflow: flowplan.workflow JSON
                          (+ optional payload/workflow-meta.json for the viewer, see below)
@@ -28,7 +28,7 @@ payload/…                the kind's own exchange format, unchanged
 preview/1.webp … 4       optional, ≤ 1 MB each, WebP/PNG/JPEG
 ```
 
-Limits: 25 MB per package, 64 KB for `template.json`. Downloads carry `template.json` with the reviewed metadata plus `license`, `author {name, handle}` and `marketplace {id, slug, version, url}`.
+`title` is the template's title in its own language; the optional `titles {de?, en?}` (each ≤ 120 characters) is the title per interface language – cards, template pages, search and sorting by title use the visitor's (else the other one, else `title`). Readers that don't know `titles` keep using `title`. Limits: 25 MB per package, 64 KB for `template.json`. Downloads carry `template.json` with the reviewed metadata plus `license`, `author {name, handle}` and `marketplace {id, slug, version, url}`.
 
 ### Automatic checks
 
@@ -102,7 +102,7 @@ CORS `*` for GET. Published templates only.
 
 | | |
 |---|---|
-| `GET /api/templates?kind=&category=&q=&lang=&sort=newest\|popular\|updated\|title\|featured&limit=&offset=&author=&official=1` | list (`{templates, total}`); each template has `official: true\|false` |
+| `GET /api/templates?kind=&category=&q=&lang=&sort=newest\|popular\|updated\|title\|featured&limit=&offset=&author=&official=1` | list (`{templates, total}`); each template has `official: true\|false` and `titles: {de, en}` (the title per interface language, `title` where the package has none; `title` itself stays the template's own and `sort=title` sorts by it) |
 | `GET /api/templates/:slug` | detail with description, versions, analysis |
 | `GET /api/templates/:slug/download[?version=N]` | the package (`X-Template-Sha256`, `X-Template-Version`); counts a download for a person's click (`?via=open` an opening from the template page), once per visitor, version and day – crawlers, link previews and scripts (by user agent and Fetch Metadata) don't count (`lib/download-count.ts`); `/robots.txt` keeps crawlers out of `/api/` |
 | `GET /api/templates/:slug/previews/:n[?version=N]` | preview image |
@@ -138,7 +138,7 @@ Every submission in the queue carries `security: {verdict, label {de, en}, count
 
 `lib/admin-edit.ts`. Two scopes, the same endpoints: **`templates/:id`** edits the template's published version (listed or unpublished; a withdrawn one answers `409 withdrawn`), **`submissions/:id`** a version waiting for review (other states: `409 not_in_review`).
 
-`PATCH` takes JSON with any of `title`, `summary: {de?, en?}`, `description: {de?, en?}` (Markdown, shown as before), `category`, `tags`, `language`, `minVersion`, `slug`, plus `notify` (boolean), `message` (to the author, ≤ 2000) and `also` (`["previews", "package"]`: changes made through the other endpoints, named in the same e-mail). Validation is the submit form's (`400 invalid_form` with `fields`); `license` is the author's choice (`400 license_readonly`), other keys `400 unknown_field`, nothing changed `400 no_changes`. The answer: `{ok, scope, templateId, versionId, slug, number, status, sha256, size, findings, official, adminOverrides, changed, notified}`.
+`PATCH` takes JSON with any of `title`, `titles: {de?, en?}` (a changed `title` without `titles` empties the per-language titles, so the new title shows in both languages), `summary: {de?, en?}`, `description: {de?, en?}` (Markdown, shown as before), `category`, `tags`, `language`, `minVersion`, `slug`, plus `notify` (boolean), `message` (to the author, ≤ 2000) and `also` (`["previews", "package"]`: changes made through the other endpoints, named in the same e-mail). Validation is the submit form's (`400 invalid_form` with `fields`); `license` is the author's choice (`400 license_readonly`), other keys `400 unknown_field`, nothing changed `400 no_changes`. The answer: `{ok, scope, templateId, versionId, slug, number, status, sha256, size, findings, official, adminOverrides, changed, notified}`.
 
 - **In place, no new version.** Metadata and previews change the version itself: its number and status stay, the package is rebuilt – the payload entries are copied unchanged, `template.json` and `preview/*` are new – and checked again like a submission (`422 package_invalid` with `findings` if not); SHA-256, size and findings are recomputed (`X-Template-Sha256` of the download matches). This is simpler and more robust than a new version for what is only metadata: no second review, no pending-version conflicts, the version history and download counts stay as they are. Preview URLs carry `&r=<hash>` so cached images are replaced.
 - **Recorded on the version** as `adminEdits` (`{at, by, fields, message, notify, notified}`, in the submission detail) and in the audit log: `admin_edit` with `fields` and `changes` (before/after for every field, only the lengths for descriptions), `admin_previews_added`, `admin_previews_reordered`, `admin_preview_removed`, `admin_package_replaced` – actor as everywhere (token label + `X-Admin-User`).
