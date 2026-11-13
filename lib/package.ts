@@ -5,6 +5,7 @@
 // The marketplace never converts payloads – it checks the envelope, the
 // limits and that the payload is what its kind says.
 import { z } from "zod";
+import { requireEnglishTitle } from "./config";
 import { createHash } from "node:crypto";
 import { CATEGORIES, KINDS, LANGUAGES, type Kind } from "./catalog";
 import { DEFAULT_ZIP_LIMITS, ZipError, readZip, writeZip } from "./zip";
@@ -226,7 +227,7 @@ export const englishTitleFinding = (manifest: Manifest | null): Finding | null =
   !manifest || manifest.titles?.en?.trim()
     ? null
     : finding(
-        "error",
+        requireEnglishTitle() ? "error" : "warning",
         "title-en-missing",
         "Im Paket fehlt der englische Titel – es kommt wohl von einer älteren Flowplan-Version. Aktualisiere Flowplan und veröffentliche die Vorlage dort noch einmal mit „Im Marketplace veröffentlichen …“: Dort gibst du den englischen Titel an.",
         'The package has no English title – it probably comes from an older Flowplan version. Update Flowplan and publish the template from there again with "Publish to the marketplace …", where you enter the English title.',
@@ -236,7 +237,7 @@ export function forSubmission(inspection: Inspection): Inspection {
   const missing = englishTitleFinding(inspection.manifest);
   if (!missing) return inspection;
   const findings = [...inspection.findings, missing];
-  return { ...inspection, findings, ok: false };
+  return { ...inspection, findings, ok: inspection.ok && missing.level !== "error" };
 }
 
 // ---- Kind payloads ----

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { pageSession, pageT } from "@/lib/page";
 import { one } from "@/lib/db";
-import { config } from "@/lib/config";
+import { config, requireEnglishTitle } from "@/lib/config";
 import { mailConfigured } from "@/lib/mail";
 import { parseJsonColumn, type TemplateRow, type VersionRow } from "@/lib/store";
 import { SubmitForm, type Fields, type SubmitMode } from "@/components/submit-form";
@@ -54,6 +54,7 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
       initial={initial}
       login={{ github: !!config.github(), email: mailConfigured() || config.demo(), demo: config.demo() }}
       returnTo={`/submit?${query}`}
+      englishRequired={requireEnglishTitle()}
     />
   );
 }

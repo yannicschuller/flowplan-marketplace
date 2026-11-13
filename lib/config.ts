@@ -82,3 +82,9 @@ export const config = {
 
 // Is the marketplace served over https (cookies get "Secure")?
 export const httpsOrigin = () => config.publicUrl().startsWith("https://");
+
+// MARKETPLACE_REQUIRE_ENGLISH_TITLE=on: a new template or version without
+// an English title is refused. Off (the default) until a Flowplan release
+// whose publish dialog asks for one is out – until then a missing English
+// title is only a warning and the German (or single) title stands in.
+export const requireEnglishTitle = () => ["1", "on", "true", "yes"].includes(text("MARKETPLACE_REQUIRE_ENGLISH_TITLE").toLowerCase());

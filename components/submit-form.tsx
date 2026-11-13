@@ -55,7 +55,7 @@ type Inspection = {
 
 const EMPTY: Fields = { titleDe: "", titleEn: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
 
-export function SubmitForm({ session, mode, initial, login, returnTo }: { session: { name: string; csrf: string } | null; mode: SubmitMode; initial: Fields | null; login: LoginConfig; returnTo: string }) {
+export function SubmitForm({ session, mode, initial, login, returnTo, englishRequired = false }: { session: { name: string; csrf: string } | null; mode: SubmitMode; initial: Fields | null; login: LoginConfig; returnTo: string; englishRequired?: boolean }) {
   const t = useT();
   const locale = t("de", "en") as "de" | "en";
   const [pkg, setPkg] = useState<PendingPackage | null>(null);
@@ -156,7 +156,7 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
   const needsPackage = mode.type !== "edit";
   const kindMismatch = !!inspection?.manifest && mode.type !== "new" && inspection.manifest.kind !== mode.kind;
   const packageOk = pkg ? !!inspection?.ok && !kindMismatch : !needsPackage;
-  const canSubmit = !!session && packageOk && fields.rights && fields.titleEn.trim().length >= 2 && fields.titleDe.trim().length !== 1 && !!(fields.summaryDe.trim() || fields.summaryEn.trim()) && status.kind !== "sending" && !checking;
+  const canSubmit = !!session && packageOk && fields.rights && (englishRequired ? fields.titleEn.trim().length >= 2 : fields.titleEn.trim().length !== 1 && (fields.titleEn.trim() || fields.titleDe.trim()).length >= 2) && fields.titleDe.trim().length !== 1 && !!(fields.summaryDe.trim() || fields.summaryEn.trim()) && status.kind !== "sending" && !checking;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -326,9 +326,11 @@ export function SubmitForm({ session, mode, initial, login, returnTo }: { sessio
             </label>
             <label className="field">
               <span>{t("Titel (Englisch)", "Title (English)")}</span>
-              <input value={fields.titleEn} onChange={(e) => set("titleEn", e.target.value)} maxLength={LIMITS.title} required minLength={2} lang="en" aria-invalid={invalid("titleEn") || undefined} aria-describedby="title-en-hint" />
+              <input value={fields.titleEn} onChange={(e) => set("titleEn", e.target.value)} maxLength={LIMITS.title} required={englishRequired} minLength={2} lang="en" aria-invalid={invalid("titleEn") || undefined} aria-describedby="title-en-hint" />
               <small id="title-en-hint" className="field-hint">
-                {t("Pflicht: Englische Seiten zeigen ihn, deutsche den deutschen Titel, wenn es einen gibt.", "Required: English pages show it, German pages the German title if there is one.")}
+                {englishRequired
+                  ? t("Pflicht: Englische Seiten zeigen ihn, deutsche den deutschen Titel, wenn es einen gibt.", "Required: English pages show it, German pages the German title if there is one.")
+                  : t("Bitte angeben: Englische Seiten zeigen ihn, deutsche den deutschen Titel. Bald ist er Pflicht.", "Please add it: English pages show it, German pages the German title. It will soon be required.")}
               </small>
             </label>
             <label className="field">

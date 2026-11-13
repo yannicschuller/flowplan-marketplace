@@ -174,6 +174,7 @@ Official templates (see [Official templates](#official-templates)) carry `offici
 | `MARKETPLACE_IMPRESSUM_URL` | Impressum (https, default `https://flowplan.org/impressum`); the footer links there and `/impressum` redirects there (308). For the default address visitors land on `/de/impressum` or `/en/impressum` of the website in their language; other addresses are used as given |
 | `MARKETPLACE_PRIVACY_URL` | privacy policy (https, default `https://flowplan.org/datenschutz`), the same way via `/datenschutz` |
 | `MARKETPLACE_DEFAULT_INSTANCE` | Flowplan instance the *In Flowplan öffnen* box preselects for visitors who haven't saved their own (https origin, default `https://app.flowplan.org`); empty or `off`: no preselection, the box asks for the address |
+| `MARKETPLACE_REQUIRE_ENGLISH_TITLE` | `on`: a new template or version without an English title (`titles.en`) is refused. Off by default until a Flowplan release whose publish dialog asks for the English title is out; until then a missing English title is a warning and the German title stands in |
 | `MARKETPLACE_DEMO` | `1`: demo data and demo sign-in – never in production |
 
 See `.env.example`.

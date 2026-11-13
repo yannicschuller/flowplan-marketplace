@@ -10,6 +10,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ADMIN_TOKEN, BASE, req, useTempData } from "./helpers";
 useTempData();
+// The rule is on in these tests (MARKETPLACE_REQUIRE_ENGLISH_TITLE); the
+// last test switches it off, as it is until a Flowplan release asks for it.
+process.env.MARKETPLACE_REQUIRE_ENGLISH_TITLE = "on";
 import { adminRoute } from "../lib/admin";
 import { handle } from "../lib/http";
 import { one, run } from "../lib/db";
@@ -156,5 +159,24 @@ test("header language switch: DE / EN links to /lang, the current one marked, ba
   for (const out of [de, en]) {
     assert.doesNotMatch(out, /style=|<script|onclick|<button/i);
     assert.equal(out.match(/<a /g)!.length, 2);
+  }
+});
+
+test("until MARKETPLACE_REQUIRE_ENGLISH_TITLE is on, a missing English title is only a warning and the German title stands in", async () => {
+  process.env.MARKETPLACE_REQUIRE_ENGLISH_TITLE = "";
+  try {
+    const { forSubmission } = await import("../lib/package");
+    const { parseAuthorForm } = await import("../lib/store");
+    const pkg = await inspectPackage(await docPackage({ title: "Nur deutsch" }));
+    const checked = forSubmission({ ...pkg, manifest: pkg.manifest && { ...pkg.manifest, titles: undefined } });
+    const missing = checked.findings.find((f) => f.code === "title-en-missing");
+    assert.equal(missing?.level, "warning");
+    assert.equal(checked.ok, pkg.ok);
+    const { form: baseForm } = await import("./fixtures");
+    const parsed = parseAuthorForm({ ...baseForm(), title: undefined, titleDe: "Nur deutsch", titleEn: "" });
+    assert.equal(parsed.title, "Nur deutsch");
+    assert.throws(() => parseAuthorForm({ ...baseForm(), title: undefined, titleDe: "", titleEn: "" }), /title/i);
+  } finally {
+    process.env.MARKETPLACE_REQUIRE_ENGLISH_TITLE = "on";
   }
 });

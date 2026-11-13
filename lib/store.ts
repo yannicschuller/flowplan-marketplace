@@ -10,7 +10,7 @@ import { buildPackage, forSubmission, inspectPackage, LIMITS, versionPattern, ty
 import { readPackage, savePackage, savePreviews } from "./storage";
 import { PENDING, transition, type Status } from "./status";
 import { hit } from "./rate-limit";
-import { config } from "./config";
+import { config, requireEnglishTitle } from "./config";
 import type { ImageType } from "./images";
 import { localTitle, type Locale } from "./i18n";
 
@@ -120,8 +120,12 @@ export const ownTitle = (language: unknown, de: string, en: string) => (language
 export function parseAuthorForm(input: unknown): SubmissionForm {
   const raw: Record<string, unknown> = input && typeof input === "object" && !Array.isArray(input) ? { ...(input as Record<string, unknown>) } : {};
   const de = typeof raw.titleDe === "string" ? raw.titleDe.trim() : "";
-  const en = typeof raw.titleEn === "string" ? raw.titleEn.trim() : "";
-  if (!en) throw new HttpError(400, "invalid_form", "An English title is needed (titleEn).", { fields: ["titleEn"] });
+  let en = typeof raw.titleEn === "string" ? raw.titleEn.trim() : "";
+  if (!en && requireEnglishTitle()) throw new HttpError(400, "invalid_form", "An English title is needed (titleEn).", { fields: ["titleEn"] });
+  // Until the English title is required (lib/config.ts), the German or the
+  // single title of an older form stands in for it.
+  if (!en) en = de || (typeof raw.title === "string" ? raw.title.trim() : "");
+  if (!en) throw new HttpError(400, "invalid_form", "A title is needed.", { fields: ["titleDe", "titleEn"] });
   if (de.length === 1) throw new HttpError(400, "invalid_form", "The German title needs at least 2 characters.", { fields: ["titleDe"] });
   if (en.length === 1) throw new HttpError(400, "invalid_form", "The English title needs at least 2 characters.", { fields: ["titleEn"] });
   raw.title = ownTitle(raw.language, de, en);
