@@ -2019,3 +2019,66 @@ textarea {
     display: none;
   }
 }
+
+/* ---------- My submissions (/me) ---------- */
+/* A readable width like the submit form; the actions sit next to the title. */
+.me {
+  max-width: 860px;
+}
+.me .page-head.with-actions {
+  align-items: center;
+}
+.me .page-head .lede {
+  margin-top: 8px;
+}
+.me > .notice {
+  margin-top: 16px;
+}
+.me-empty {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+.me-empty p {
+  margin: 0;
+  color: var(--secondary);
+  max-width: 560px;
+}
+.me-empty strong {
+  color: var(--text, inherit);
+}
+.me-card,
+.me .danger-zone {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--card);
+}
+.me-card {
+  border: 1px solid var(--border);
+}
+.me-card h2,
+.me .danger-zone h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.me-card > p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--secondary);
+}
+@media (max-width: 640px) {
+  .me .page-head.with-actions {
+    align-items: flex-start;
+  }
+  .me-empty,
+  .me-card,
+  .me .danger-zone {
+    padding: 16px;
+  }
+}

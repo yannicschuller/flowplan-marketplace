@@ -71,9 +71,18 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
         </p>
       )}
       {items.length === 0 ? (
-        <p className="empty">
-          {t("Noch nichts eingereicht.", "Nothing submitted yet.")} <Link href="/submit">{t("Erste Vorlage einreichen", "Submit your first template")}</Link>
-        </p>
+        <div className="me-empty">
+          <p>
+            <strong>{t("Noch nichts eingereicht.", "Nothing submitted yet.")}</strong>{" "}
+            {t(
+              "Teile eine Vorlage, eine Ansicht oder ein Paket aus deinem Flowplan – nach der Prüfung erscheint sie im Marketplace.",
+              "Share a template, view or package from your Flowplan – once reviewed, it appears in the marketplace.",
+            )}
+          </p>
+          <Link href="/submit" className="button primary">
+            <Plus size={15} weight="bold" aria-hidden="true" /> {t("Erste Vorlage einreichen", "Submit your first template")}
+          </Link>
+        </div>
       ) : (
         <ul className="submissions">
           {items.map(({ template, versions }) => {
@@ -156,8 +165,9 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
           })}
         </ul>
       )}
-      <section className="section">
-        <h2>{t("Name an deinen Vorlagen", "Name on your templates")}</h2>
+      <section className="section me-card" aria-labelledby="name-title">
+        <h2 id="name-title">{t("Name an deinen Vorlagen", "Name on your templates")}</h2>
+        <p>{t("So erscheinst du als Autorin oder Autor bei deinen Vorlagen und auf deinem Profil.", "This is how you appear as the author of your templates and on your profile.")}</p>
         <ProfileForm name={session.user.name} csrf={session.csrf} />
       </section>
       <section className="section danger-zone" id="delete" aria-labelledby="delete-title">
