@@ -24,6 +24,7 @@ template.json            format, kind, title, titles{de?,en}, summary{de,en}, de
 payload/…                the kind's own exchange format, unchanged
                          document/database: flowplan-template-1 ZIP · workflow: flowplan.workflow JSON
                          (+ optional payload/workflow-meta.json for the viewer, see below)
+                         (+ optional payload/study-meta.json for a flashcard deck's sample cards, see below)
                          whiteboard, appearance (+ fonts), link-rules: JSON
 preview/1.webp … 4       optional, ≤ 1 MB each, WebP/PNG/JPEG
 ```
@@ -64,6 +65,24 @@ Flowplan adds `payload/workflow-meta.json` to every workflow package it builds (
 ```
 
 `nodes` holds exactly the node types the graph uses. A gap is a gallery workflow's `$ask:<id>` token or the id of a reference (database, page, person …) of a published workflow. Everything is checked like the rest of the package (`lib/workflow-meta.ts`): texts are length-limited, unknown fields are dropped, an `icon` that is not plain path data is dropped (finding `workflow-meta-icon`), a broken file gives the finding `workflow-meta-invalid`. Without the file (older packages) the viewer shows the raw node types with a generic symbol. Nothing from a package is rendered as HTML, nothing is fetched or linked, large graphs are cut at 100 nodes with a note, settings at 40 rows per node. Code: `lib/workflow-view.ts` (model and summary), `lib/workflow-svg.ts` (SVG), `lib/workflow-viewer.ts` (from a package), `components/workflow-viewer.tsx`.
+
+### Flashcard decks
+
+A flashcard deck is a database template with a card mapping (`kind: "database"`, the deck in `payload/template.zip` as always). Since Flowplan 0.10.2 its package also carries `payload/study-meta.json` – the deck's numbers and up to five sample cards, which the template page shows under *Beispielkarten* / *Sample cards* (front and back side by side) and the submit page under *So sehen die Karten aus*:
+
+```
+{ "format": "flowplan.study-meta", "version": 1,
+  "records": n, "cards": n, "reverse": bool,
+  "types": { "basic"?: n, "cloze"?: n, "typed"?: n, "choice"?: n, "occlusion"?: n },
+  "samples": [ { "type": "basic|cloze|typed|choice|occlusion",
+                 "front": [ {"text", "gap"?: true} ], "back": [ {"text", "gap"?: true} ],
+                 "choices"?: [text],
+                 "image"?: { "file": "<id of files/<id> in payload/template.zip>", "alt" },
+                 "masks"?: [ { "shape": "rect|ellipse|polygon", "x", "y", "w", "h",
+                               "points"?: [[x, y]], "label"?, "asked"?: true } ] } ] }
+```
+
+A side is plain text in runs; `gap` marks a cloze – on the front the hidden gap (its text is the hint or "…"), on the back the revealed answer. Masks are fractions (0–1) of the picture, `asked` the one the card asks for. Flowplan never puts learning states or anything about people into a published deck (the cards install as new; person properties, mentions and who made a record stay in the instance). The check (`lib/study-meta.ts`): at most 64 KB, five samples, 40 runs of 500 characters (1,200 per side), five options, 100 masks of 64 points, labels 200 characters; control, bidi and zero-width characters removed, unknown fields dropped, masks must lie on the picture, a picture must be an attachment of the template itself that really is a PNG, JPEG or WebP of at most 2 MB (others: shown without the picture, finding `study-meta-image`). A broken file gives the warning `study-meta-invalid` and no preview – the deck itself is unaffected; other problems `study-meta-partial`. The analysis carries `study {records, cards, reverse, types, samples, images}`. Rendering (`components/study-samples.tsx`): runs as React text, masks as SVG shapes with numeric attributes over the picture, no HTML and no style attributes; pictures only through `/api/templates/:slug/cards/:n` (the template's attachment by its bytes, `Content-Security-Policy: default-src 'none'`). Packages without the file (older Flowplans) show no sample cards; older marketplaces keep the file as part of the payload.
 
 ### Statuses
 
@@ -108,6 +127,7 @@ CORS `*` for GET. Published templates only.
 | `GET /api/templates/:slug` | detail with description, versions, analysis |
 | `GET /api/templates/:slug/download[?version=N]` | the package (`X-Template-Sha256`, `X-Template-Version`); counts a download for a person's click (`?via=open` an opening from the template page), once per visitor, version and day – crawlers, link previews and scripts (by user agent and Fetch Metadata) don't count (`lib/download-count.ts`); `/robots.txt` keeps crawlers out of `/api/` |
 | `GET /api/templates/:slug/previews/:n[?version=N]` | preview image |
+| `GET /api/templates/:slug/cards/:n[?version=N]` | the picture of a flashcard deck's sample card n ([Flashcard decks](#flashcard-decks)) |
 
 ## Admin API
 
@@ -116,9 +136,10 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | | |
 |---|---|
 | `GET /api/admin/submissions?status=a,b\|all` | queue (default: submitted, in_review, changes_requested) with findings, author, sizes |
-| `GET /api/admin/submissions/:id` | detail: template.json, findings, previews (URLs), diff to the published version, author's history, for workflows `workflow` (below), `security` (below); starts the review |
+| `GET /api/admin/submissions/:id` | detail: template.json, findings, previews (URLs), diff to the published version, author's history, for workflows `workflow` (below), for flashcard decks `study` (below), `security` (below); starts the review |
 | `GET /api/admin/submissions/:id/package` | the package |
 | `GET /api/admin/submissions/:id/previews/:n` | a preview image |
+| `GET /api/admin/submissions/:id/cards/:n` | the picture of a flashcard deck's sample card n |
 | `POST /api/admin/submissions/:id/decision` | `{decision: "publish"\|"request_changes"\|"reject", message, securityOverride?}` – e-mails the author; publishing a `block` verdict needs `securityOverride` (a reason, audited), else `409 security_blocked` |
 | `POST /api/admin/submissions/:id/rescan` | runs the [security scan](#security-scan) again (audited as `security_rescan`), answers `{security}` |
 | `GET /api/admin/templates?state=listed\|unpublished\|withdrawn\|all` | templates with a published version |
@@ -133,6 +154,8 @@ For flowplan-admin. `Authorization: Bearer $MARKETPLACE_ADMIN_TOKEN`; optional `
 | `POST …/package` (multipart `package`, optional `changelog`; `?dryRun=1` only checks) | replace the package (on `templates/:id` or `submissions/:id`) |
 
 For a workflow submission the detail has `workflow: {summary: {de, en}, viewer: {de, en}}` (`null` for other kinds): `summary` is *Was er macht* as plain text (one line for the trigger, then `1. …` per step); `viewer.<lang>` is what the template page shows – `svg` (the diagram as markup: only `svg, defs, marker, g, rect, path, text, title`, every text escaped, no styles, scripts or links; it is styled by the class names `wf-…`, see `app/globals.css`), `bounds {x, y, w, h}`, `nodes` (id, type, label, name, description, group, icon path, position, host, risks, ports, `settings` – read-only rows, see `SettingValue` in `lib/workflow-view.ts` – and the step number), `edges`, `loops`, `summary {lead, steps, notes}`, `gaps` (labels), `shown`/`total` and `risks {ai, email, external, hosts}`.
+
+For a database submission with `payload/study-meta.json` (a [flashcard deck](#flashcard-decks)) the detail has `study: {records, cards, reverse, types, samples}` (`null` otherwise – other kinds, databases without it, a broken file): the checked samples as on the template page, each `{type, front, back, choices, masks, image: {alt, type, url} | null}` – `url` is `…/submissions/:id/cards/:n` (admin token), the attachment id is not passed on; `analysis.study` in the queue has the numbers. Added in this form in 0.10.2 of Flowplan's package format; an older flowplan-admin ignores the field.
 
 Every submission in the queue carries `security: {verdict, label {de, en}, counts {block, warn, info}, scannedAt, scannerVersion, overridden}` (`null` until the first scan, which then runs in the background); the detail carries the full scan: `security: {verdict, label, counts, findings: [{severity, code, at, de, en, count?}], scannedAt, scannerVersion, sha256, kind, override: {reason, by, at} | null}`.
 
@@ -183,12 +206,12 @@ See `.env.example`.
 
 ```bash
 npm ci
-npm run demo              # http://localhost:3000 with 10 example templates, data in ./data-demo
+npm run demo              # http://localhost:3000 with 11 example templates, data in ./data-demo
 npm run demo -- --fresh   # start over; --prod serves the last `npm run build`
 npm run typecheck && npm test && npm run build
 ```
 
-Demo mode: three authors, templates of every kind (eight published, one submitted, one with changes requested), one open report, a "Demo: sign in as the demo author" button and the admin token `demo-admin-token` (unless `MARKETPLACE_ADMIN_TOKEN` is set). Without SMTP the sign-in link is shown on the page.
+Demo mode: three authors, templates of every kind (nine published, one of them a flashcard deck, one submitted, one with changes requested), one open report, a "Demo: sign in as the demo author" button and the admin token `demo-admin-token` (unless `MARKETPLACE_ADMIN_TOKEN` is set). Without SMTP the sign-in link is shown on the page.
 
 ```bash
 curl -H 'Authorization: Bearer demo-admin-token' http://localhost:3000/api/admin/submissions

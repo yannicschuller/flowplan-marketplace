@@ -22,6 +22,8 @@ import { Lock } from "@phosphor-icons/react/dist/ssr/Lock";
 import { versionViewer } from "@/lib/workflow-viewer";
 import { WorkflowViewer } from "@/components/workflow-viewer";
 import { WorkflowSummary } from "@/components/workflow-summary";
+import { versionStudy } from "@/lib/study-viewer";
+import { StudySamples } from "@/components/study-samples";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -52,6 +54,8 @@ export default async function TemplatePage({ params }: Props) {
   const otherLanguage = !wanted && !!description;
   const wf = analysis.workflow;
   const viewer = row.kind === "workflow" ? await versionViewer(row, locale) : null;
+  // A flashcard deck: its sample cards (lib/study-viewer.ts).
+  const study = row.kind === "database" ? await versionStudy(row) : null;
   const number = (n: number) => n.toLocaleString(locale === "de" ? "de-DE" : "en-GB");
 
   return (
@@ -117,6 +121,13 @@ export default async function TemplatePage({ params }: Props) {
         <section className="workflow-view" aria-labelledby="workflow-view-title">
           <h2 id="workflow-view-title">{t("Ablauf ansehen", "Look at the flow")}</h2>
           <WorkflowViewer data={viewer} />
+        </section>
+      )}
+
+      {study && (
+        <section className="study-view" aria-labelledby="study-view-title">
+          <h2 id="study-view-title">{t("Beispielkarten", "Sample cards")}</h2>
+          <StudySamples meta={study} imageSrc={(n) => `/api/templates/${row.slug}/cards/${n}?version=${row.number}&r=${row.sha256.slice(0, 12)}`} t={t} number={number} />
         </section>
       )}
 

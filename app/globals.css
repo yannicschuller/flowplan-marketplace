@@ -2082,3 +2082,196 @@ textarea {
     padding: 16px;
   }
 }
+
+/* ---- Sample cards of a flashcard deck (components/study-samples.tsx) ----
+   Masks are SVG shapes over the picture, placed by their attributes only:
+   no style attributes (strict CSP). */
+.study-view {
+  margin-top: 28px;
+  scroll-margin-top: 84px;
+}
+.study-view > h2 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+.submit-study > h3 {
+  font-size: 15px;
+  margin: 18px 0 10px;
+}
+.study-counts {
+  margin: 0 0 8px;
+  color: var(--secondary);
+}
+.study-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.study-types li {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--surface);
+}
+.study-cards {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.study-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 12px 14px 14px;
+  min-width: 0;
+}
+.study-type {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.study-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .study-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.study-side {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+.study-back {
+  background: var(--blue-light);
+}
+.study-side-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.study-text {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.study-gap {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--secondary);
+  font-weight: 600;
+}
+.study-answer {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+.study-choices {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.study-choices li {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 14px;
+}
+.study-choices li.is-correct {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  font-weight: 600;
+}
+.study-typed {
+  margin: 0;
+  font-size: 13px;
+}
+.study-figure {
+  margin: 4px 0 6px;
+}
+.study-figure figcaption {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.study-picture {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.study-picture img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  height: auto;
+}
+.study-picture-missing {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px dashed var(--border);
+  background: var(--card);
+}
+.study-picture-note {
+  position: absolute;
+  left: 8px;
+  bottom: 10px;
+  line-height: 1.3;
+  font-size: 12px;
+  color: var(--muted);
+}
+.study-masks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.study-mask {
+  fill: var(--secondary);
+  fill-opacity: 0.85;
+  stroke: var(--card);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.study-mask-asked {
+  fill: var(--signal);
+  fill-opacity: 0.9;
+}
+.study-mask-revealed {
+  fill: transparent;
+  stroke: var(--signal);
+  stroke-width: 3;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

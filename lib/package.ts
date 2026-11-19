@@ -13,6 +13,7 @@ import { IMAGE_MIME, claimedImageType, sniffFont, sniffImage, type ImageType } f
 import { containsHtml } from "./markdown";
 import { LIMITS } from "./limits";
 import { readWorkflowMeta, WORKFLOW_META_PATH } from "./workflow-meta";
+import { readStudyMeta, studyAnalysis, withImages, STUDY_META_PATH, type StudyAnalysis } from "./study-meta";
 
 export const PACKAGE_FORMAT = "flowplan-marketplace-1";
 export const PACKAGE_EXTENSION = ".flowplan-template";
@@ -72,6 +73,8 @@ export type Analysis = {
   fonts?: number;
   rules?: number;
   workflow?: WorkflowAnalysis;
+  // A flashcard deck: payload/study-meta.json present and readable (numbers and sample cards for the preview).
+  study?: StudyAnalysis;
 };
 export type Preview = { n: number; type: ImageType; bytes: Buffer };
 export type Inspection = {
@@ -283,6 +286,20 @@ async function checkPayload(manifest: Manifest, payload: Buffer, entries: Map<st
           analysis.fields = database.fields.length;
           analysis.views = database.views.length;
           analysis.rows = Array.isArray(content.rows) ? content.rows.length : 0;
+        }
+        // A flashcard deck's preview (optional; older packages and other databases have none).
+        const metaBytes = entries.get(STUDY_META_PATH);
+        if (metaBytes) {
+          const study = withImages(readStudyMeta(metaBytes), inner);
+          if (!study.meta)
+            findings.push(finding("warning", "study-meta-invalid", "study-meta.json ist ungültig – die Vorlagenseite zeigt keine Beispielkarten.", "study-meta.json is invalid – the template page shows no sample cards.", STUDY_META_PATH));
+          else {
+            analysis.study = studyAnalysis(study.meta);
+            if (study.problems.includes("image"))
+              findings.push(finding("warning", "study-meta-image", "Ein Bild einer Beispielkarte fehlt in der Vorlage oder ist kein WebP-, PNG- oder JPEG-Bild bis 2 MB – die Karte wird ohne Bild gezeigt.", "A sample card's picture is missing from the template or is not a WebP, PNG or JPEG image of up to 2 MB – the card is shown without it.", STUDY_META_PATH));
+            if (study.problems.some((p) => p !== "image"))
+              findings.push(finding("warning", "study-meta-partial", "Teile von study-meta.json sind ungültig und werden nicht gezeigt.", "Parts of study-meta.json are invalid and are not shown.", STUDY_META_PATH));
+          }
         }
       }
       const files = Array.isArray(t.files) ? (t.files as { id?: unknown; sha256?: unknown; name?: unknown }[]) : [];

@@ -20,6 +20,8 @@ import { PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr/PaperPlaneTilt";
 import { WorkflowViewer } from "./workflow-viewer";
 import { WorkflowSummary } from "./workflow-summary";
 import type { ViewerData } from "@/lib/workflow-viewer";
+import type { StudyMeta } from "@/lib/study-meta";
+import { StudySamples } from "./study-samples";
 
 export type Fields = {
   // The English title is required, the German one optional; the server
@@ -51,6 +53,8 @@ type Inspection = {
   previews: { n: number; type: string; data: string }[];
   // A workflow's diagram and summary (lib/workflow-viewer.ts).
   viewer?: ViewerData | null;
+  // A flashcard deck's sample cards (lib/study-meta.ts), pictures as data: addresses.
+  study?: { meta: StudyMeta; images: Record<string, string> } | null;
 };
 
 const EMPTY: Fields = { titleDe: "", titleEn: "", summaryDe: "", summaryEn: "", descriptionDe: "", descriptionEn: "", category: "other", tags: "", language: "de", minVersion: "0.9.4", license: DEFAULT_LICENSE, rights: false, changelog: "" };
@@ -291,6 +295,12 @@ export function SubmitForm({ session, mode, initial, login, returnTo, englishReq
             <h3>{t("So sieht der Ablauf aus", "This is the flow")}</h3>
             <WorkflowViewer data={inspection.viewer} />
             <WorkflowSummary view={inspection.viewer.view} t={t} />
+          </div>
+        )}
+        {inspection?.study && (
+          <div className="study-view submit-study">
+            <h3>{t("So sehen die Karten aus", "This is what the cards look like")}</h3>
+            <StudySamples meta={inspection.study.meta} imageSrc={(n) => inspection.study?.images[String(n)] ?? null} t={t} number={(n) => n.toLocaleString(locale === "de" ? "de-DE" : "en-GB")} />
           </div>
         )}
         {previewUrls.length > 0 && (

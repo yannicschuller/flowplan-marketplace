@@ -1,4 +1,4 @@
-import { appearancePayload, buildSamplePackage, databasePayload, documentPayload, linkRulesPayload, previewImage, whiteboardPayload, workflowPayload, type PackageSpec } from "../lib/sample-packages";
+import { appearancePayload, buildSamplePackage, databasePayload, deckPayload, documentPayload, linkRulesPayload, previewImage, whiteboardPayload, workflowPayload, type PackageSpec } from "../lib/sample-packages";
 
 export const docSpec = (over: Partial<PackageSpec> = {}): PackageSpec => ({
   kind: "document",
@@ -34,6 +34,9 @@ export const workflowPackage = (config: Record<string, unknown> = {}) =>
       ),
     ],
   });
+// A flashcard deck as Flowplan publishes it (template + study-meta.json, a PNG attachment as the occlusion picture).
+export const deckPackage = (meta: Record<string, unknown> = {}, picture: Buffer = previewImage("database", "#2f6f5e")) =>
+  buildSamplePackage({ kind: "database", title: "Cell biology", summary: { en: "Flashcards" }, category: "knowledge", tags: ["Lernkarten"], language: "en", payload: deckPayload("Cell biology", picture, meta) });
 export const allKindPackages = () => [
   docPackage(),
   buildSamplePackage({ kind: "database", title: "DB", summary: { de: "DB" }, category: "planning", payload: [databasePayload("DB", "planning", [{ id: "f1", name: "Name", type: "text" }], [{ f1: "x" }])] }),

@@ -1,11 +1,11 @@
-// Demo data (npm run demo, MARKETPLACE_DEMO=1): three authors, nine
-// templates of every kind, most published, some waiting for review, one
+// Demo data (npm run demo, MARKETPLACE_DEMO=1): three authors,
+// templates of every kind (a flashcard deck among them), most published, some waiting for review, one
 // report – built through the same code paths as real submissions.
 import { one, run } from "./db";
 import { createUser, type User } from "./auth";
 import { submit } from "./store";
 import { decide, setFeatured } from "./admin";
-import { appearancePayload, buildSamplePackage, databasePayload, documentPayload, linkRulesPayload, previewImage, whiteboardPayload, workflowPayload, type PackageSpec } from "./sample-packages";
+import { appearancePayload, buildSamplePackage, databasePayload, deckPayload, documentPayload, linkRulesPayload, previewImage, whiteboardPayload, workflowPayload, type PackageSpec } from "./sample-packages";
 import { createReport } from "./reports";
 
 type Demo = { author: "demo" | "jonas" | "mei"; spec: PackageSpec; form?: Record<string, unknown>; status: "published" | "submitted" | "changes_requested"; downloads?: number; opens?: number; message?: string };
@@ -111,6 +111,22 @@ const demos = (): Demo[] => [
         ),
       ],
       previews: [previewImage("database", "#4cb782", 1)],
+    },
+  },
+  {
+    // A flashcard deck: its sample cards on the template page (README "Flashcard decks").
+    author: "mei",
+    status: "published",
+    downloads: 37,
+    opens: 22,
+    spec: {
+      kind: "database",
+      title: "Cell biology",
+      summary: { de: "Lernkarten zur Zellbiologie: Lückentext, Vorder-/Rückseite und Bildverdeckung.", en: "Flashcards on cell biology: cloze, front and back, and image occlusion." },
+      category: "knowledge",
+      tags: ["Lernkarten", "biology"],
+      language: "en",
+      payload: deckPayload("Cell biology", previewImage("database", "#2f6f5e", 0)),
     },
   },
   {

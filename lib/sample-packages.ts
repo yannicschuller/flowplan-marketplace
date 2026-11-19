@@ -92,6 +92,61 @@ export function databasePayload(name: string, category: string, fields: Field[],
   };
 }
 
+// A flashcard deck as Flowplan publishes it (README "Flashcard decks"): a
+// database template with a card mapping, one record with a picture and
+// masks, and payload/study-meta.json with the samples – the picture by its
+// attachment id. `meta` replaces parts of the study meta (tests).
+export function deckPayload(name: string, picture: Buffer, meta: Record<string, unknown> = {}) {
+  const fileId = randomUUID();
+  const masks = [
+    { id: "m1", shape: "rect", x: 0.1, y: 0.2, w: 0.25, h: 0.2, label: "Nucleus" },
+    { id: "m2", shape: "ellipse", x: 0.5, y: 0.5, w: 0.2, h: 0.2, label: "Mitochondrion" },
+    { id: "m3", shape: "polygon", x: 0.6, y: 0.1, w: 0.2, h: 0.2, points: [[0.6, 0.1], [0.8, 0.1], [0.7, 0.3]] },
+  ];
+  const html = `<p>Name the part.</p><img src="/api/files/${fileId}" alt="A cell" data-occlusion="${JSON.stringify({ v: 1, mode: "hide-one", masks }).replace(/"/g, "&quot;")}">`;
+  const fields = [
+    { id: "title", name: "Front", type: "text" },
+    { id: "back", name: "Back", type: "text" },
+    { id: "type", name: "Card type", type: "select", options: ["Front/back", "Cloze", "Image occlusion"] },
+  ];
+  const rows = [
+    { cells: { title: "The {{c1::mitochondrion}} makes ATP.", back: "", type: "Cloze" }, content: "" },
+    { cells: { title: "What is osmosis?", back: "Water moving through a membrane.", type: "Front/back" }, content: "" },
+    { cells: { title: "", back: "", type: "Image occlusion" }, content: html },
+  ];
+  const content = {
+    database: { fields, views: [{ id: "study", name: "Study", type: "study", filters: [], sorts: [] }, { id: "table", name: "All cards", type: "table", filters: [], sorts: [] }], settings: { study: { version: 1, type: { field: "type" }, front: { field: "title" }, back: { field: "back" } } } },
+    rows: rows.map((r, i) => ({ id: randomUUID(), ...r, position: i })),
+    relationPairs: [],
+  };
+  const manifest = {
+    format: "flowplan-template-1",
+    name,
+    kind: "database",
+    category: "knowledge",
+    payload: JSON.stringify(content),
+    files: [{ id: fileId, name: "cell.png", mime: "image/png", sha256: sha(picture) }],
+  };
+  const study = {
+    format: "flowplan.study-meta",
+    version: 1,
+    records: 3,
+    cards: 5,
+    reverse: false,
+    types: { basic: 1, cloze: 1, occlusion: 3 },
+    samples: [
+      { type: "cloze", front: [{ text: "The " }, { text: "…", gap: true }, { text: " makes ATP." }], back: [{ text: "The " }, { text: "mitochondrion", gap: true }, { text: " makes ATP." }] },
+      { type: "basic", front: [{ text: "What is osmosis?" }], back: [{ text: "Water moving through a membrane." }] },
+      { type: "occlusion", front: [{ text: "Name the part." }], back: [], image: { file: fileId, alt: "A cell" }, masks: masks.map((m, i) => ({ shape: m.shape, x: m.x, y: m.y, w: m.w, h: m.h, ...(m.points ? { points: m.points } : {}), ...(m.label ? { label: m.label } : {}), ...(i === 0 ? { asked: true } : {}) })) },
+    ],
+    ...meta,
+  };
+  return [
+    { path: "payload/template.zip", bytes: writeZip([["template.json", Buffer.from(JSON.stringify(manifest))], [`files/${fileId}`, picture]]) },
+    { path: "payload/study-meta.json", bytes: Buffer.from(JSON.stringify(study, null, 2)) },
+  ];
+}
+
 // lib/workflows/portable.ts export: {format, version, title, graph, references}.
 type Node = { id: string; type: string; label: string; config?: Record<string, unknown>; x: number; y: number };
 export function workflowPayload(title: string, nodes: Node[], edges: [string, string, string?][]) {

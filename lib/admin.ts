@@ -3,6 +3,7 @@
 // (who = the token's label, plus the person flowplan-admin names in the
 // optional X-Admin-User header).
 import { adminWorkflowViewer } from "./workflow-viewer";
+import { adminStudy, imageResponse, versionStudyImage } from "./study-viewer";
 import { all, now, one, run, transaction } from "./db";
 import { config } from "./config";
 import { HttpError, clientIp, json, readJson } from "./http";
@@ -209,6 +210,8 @@ export async function submissionDetail(id: string, actor: string) {
       diff: versionDiff(v, base),
       // Workflows: the viewer's summary and data (README, "Workflow viewer"); null for other kinds.
       workflow: v.kind === "workflow" ? await adminWorkflowViewer(v) : null,
+      // Flashcard decks: the sample cards as on the template page (README, "Flashcard decks"); null otherwise.
+      study: v.kind === "database" ? await adminStudy(v, (n) => `${adminBase()}/submissions/${v.id}/cards/${n}`) : null,
       // The full security scan: verdict, findings, scannedAt, scannerVersion, override.
       security: await securityOf(v.id),
       authorHistory: {
@@ -229,6 +232,13 @@ export function submissionPackage(id: string) {
       "Cache-Control": "no-store",
     },
   });
+}
+// The picture of a deck's sample card n (only the template's own PNG, JPEG or WebP attachments).
+export async function submissionCard(id: string, n: number) {
+  const v = requireVersion(id);
+  const image = v.kind === "database" ? await versionStudyImage(v, n) : null;
+  if (!image) throw new HttpError(404, "not_found", "Picture not found.");
+  return imageResponse(image, { "Cache-Control": "no-store" });
 }
 export function submissionPreview(id: string, n: number) {
   const v = requireVersion(id);
@@ -480,6 +490,7 @@ export async function adminRoute(request: Request, path: string[]): Promise<Resp
   if (method === "GET" && a === "submissions" && b && !c) return json(await submissionDetail(b, actor));
   if (method === "GET" && a === "submissions" && b && c === "package" && !d) return submissionPackage(b);
   if (method === "GET" && a === "submissions" && b && c === "previews" && d) return submissionPreview(b, Number(d));
+  if (method === "GET" && a === "submissions" && b && c === "cards" && d && !e) return await submissionCard(b, Number(d));
   if (method === "POST" && a === "submissions" && b && c === "decision") return json(await decide(b, await body(), actor));
   if (method === "POST" && a === "submissions" && b && c === "rescan" && !d) return json({ security: await rescan(b, actor, audit) });
   if (method === "GET" && a === "templates" && !b) return json(listTemplates(url.searchParams.get("state")));

@@ -9,6 +9,8 @@ import { createReport } from "./reports";
 import { hit, ipKey } from "./rate-limit";
 import { forSubmission, inspectPackage, LIMITS } from "./package";
 import { viewerFromEntries } from "./workflow-viewer";
+import { imageResponse, versionStudyImage } from "./study-viewer";
+import { studyFromEntries } from "./study-meta";
 import { countable, firstToday } from "./download-count";
 import { LOCALE_COOKIE, pickLocale } from "./i18n";
 import {
@@ -135,6 +137,21 @@ export function previewRoute(request: Request, slug: string, n: number) {
   });
 }
 
+// The picture of a flashcard deck's sample card n (lib/study-viewer.ts):
+// only an attachment of the template itself that is a PNG, JPEG or WebP.
+export async function studyCardRoute(request: Request, slug: string, n: number) {
+  const p = new URL(request.url).searchParams;
+  const found = downloadable(slug, p.get("version") ? Number(p.get("version")) : null);
+  if (!found) {
+    const redirect = moved(request, slug, `/cards/${Math.trunc(n)}`);
+    if (redirect) return redirect;
+    throw new HttpError(404, "not_found", "Picture not found.");
+  }
+  const image = await versionStudyImage(found.version, n);
+  if (!image) throw new HttpError(404, "not_found", "Picture not found.");
+  return imageResponse(image, { ...CORS_HEADERS, "Cache-Control": "public, max-age=86400, immutable" });
+}
+
 export async function reportRoute(request: Request) {
   requireSameOrigin(request);
   const body = await readJson(request, 8 * 1024);
@@ -156,12 +173,17 @@ export async function inspectRoute(request: Request) {
     inspection.manifest?.kind === "workflow" && inspection.analysis.workflow
       ? viewerFromEntries(inspection.payloadEntries, inspection.manifest.payload, pickLocale(cookie(request, LOCALE_COOKIE), request.headers.get("accept-language")))
       : null;
+  // A flashcard deck's sample cards, their pictures as data: addresses (the submit preview).
+  const deck =
+    inspection.manifest?.kind === "database" && inspection.analysis.study ? await studyFromEntries(new Map(inspection.payloadEntries), inspection.manifest.payload) : null;
+  const study = deck ? { meta: deck.meta, images: Object.fromEntries([...deck.images].map(([n, img]) => [n, `data:${IMAGE_MIME[img.type]};base64,${img.bytes.toString("base64")}`])) } : null;
   return json({
     ok: inspection.ok,
     manifest: inspection.manifest,
     findings: inspection.findings,
     analysis: inspection.analysis,
     viewer,
+    study,
     size: inspection.size,
     previews: inspection.previews.map((p) => ({ n: p.n, type: IMAGE_MIME[p.type], data: p.bytes.toString("base64") })),
   });
